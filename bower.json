@@ -1,6 +1,6 @@
 {
   "name": "Chick",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "authors": [
     "Ruben Seyferth <ruben.seyferth@gmail.com>"
   ],
@@ -27,6 +27,5 @@
     "hammer.js": "~2.0.4",
     "gsap": "~1.15.1"
   },
-  "devDependencies": {
-  }
+  "devDependencies": {}
 }
