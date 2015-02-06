@@ -26,6 +26,8 @@
     "History",
     "moment",
     "TweenLite",    
-    "Modernizr"
+    "Modernizr",
+    "Hammer",
+    "Chick"
   ]
 }

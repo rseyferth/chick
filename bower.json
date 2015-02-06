@@ -1,21 +1,32 @@
 {
-	"name": "Chick",
-	"version": "0.0.0",
-	"authors": [
-		"Ruben Seyferth <ruben.seyferth@gmail.com>"
-	],
-	"description": "The Chick light-weight Javascript framework for web-apps.",
-	"main": "dist/chick.js",
-	"moduleType": [
-		
-	],
-	"license": "MIT",
-	"ignore": [
-		"**/.*",
-		"node_modules",
-		"bower_components",
-		"app/bower_components",
-		"test",
-		"tests"
-	]
+  "name": "Chick",
+  "version": "0.0.0",
+  "authors": [
+    "Ruben Seyferth <ruben.seyferth@gmail.com>"
+  ],
+  "description": "The Chick light-weight Javascript framework for web-apps.",
+  "main": "dist/chick.js",
+  "moduleType": [],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "app/bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": ">=1.11.0",
+    "underscore": "~1.7.0",
+    "inflection": null,
+    "moment": "~2.8.3",
+    "history.js": "~1.8.0",
+    "html5shiv": "~3.7.2",
+    "jquery.hotkeys": "jeresig/jquery.hotkeys#~0.2.0",
+    "hammer.js": "~2.0.4",
+    "gsap": "~1.15.1"
+  },
+  "devDependencies": {
+  }
 }

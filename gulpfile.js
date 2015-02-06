@@ -4,10 +4,38 @@ var gulp = require('gulp'),
 	rename = require('gulp-rename'),
 	concat = require('gulp-concat');
 
+function handleError(err) {
+	console.log(err.toString());
+	this.emit('end');
+}
+
+
 
 gulp.task('js', function() {
 
-	return gulp.src('src/**/*.js')
+	return gulp.src([
+			'src/Chick.js',
+			
+     		'src/Core/TriggerClass.js',
+	        'src/Core/Promise.js',
+	        'src/Core/Model.js',
+	        'src/Core/Collection.js',
+	        'src/Core/Controller.js',
+	        'src/Core/Request.js',
+	        'src/Core/Route.js',
+	        'src/Core/Router.js',
+	        'src/Core/Redirect.js',
+	        
+	        'src/Net/Api.js',
+	        'src/Net/ApiCall.js',
+	        'src/Net/ApiResult.js',
+
+	        'src/Gui/I18n.js',
+	        'src/Gui/Template.js',
+	        'src/Gui/View.js',
+	        'src/Gui/Interface.js',
+	        'src/Gui/App.js'	        
+		])
 		.pipe(jshint())
 		.pipe(jshint.reporter('jshint-stylish'))
 		
@@ -36,7 +64,8 @@ gulp.task('clean', require('del').bind(null, ['dist']));
 
 gulp.task('watch', function() {
 
-	gulp.watch('src/**/*.js', ['default']);
+	gulp.watch('src/**/*.js', ['js'])
+		.on('error', handleError);
 
 });
 
