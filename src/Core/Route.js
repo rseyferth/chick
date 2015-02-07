@@ -88,12 +88,17 @@
 
 	};
 
-	Route.prototype.leave = function() {
+	Route.prototype.leave = function(newRequest) {
 
 		// Did we have a view?
 		if (this.view) {
-			this.view.trigger('leave');
+
+			// Wait for the outro to complete?
+			return this.view.leave(newRequest);			
+
 		}
+
+		return true;
 
 
 	};

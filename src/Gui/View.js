@@ -9,14 +9,46 @@
 		this.template = null;
 		this.__loadPromise = undefined;
 		this.__waitFor = [];
+		this.__waitForLeaveAnimation = false;
 		
 		this.$element = $('<div class="view"></div>').addClass(inflection.dasherize(source).replace('/', '-'));
 
-		this.__registerEvents(['ready', 'leave']);
+		this.__registerEvents(['ready', 'leave', 'render']);
 
 	}
 	ns.register('Gui.View', ns.Core.TriggerClass, View);
 	
+
+
+	View.prototype.preloadImage = function(url) {
+
+		// Create loader
+		var promise = ns.promise();
+		$('<img/>')
+			.on('load', function(){
+				promise.resolve();
+			})
+			.on('error', function() {
+				promise.resolve();
+				throw 'Could not find image: ' + url;
+			})
+			.attr('src', url);
+		
+		// Add to waits
+		this.__waitFor.push(promise);
+		return this;
+
+	};
+
+	View.prototype.preloadImages = function(urls) {
+
+		// Loop
+		for (var i in urls) {
+			this.preloadImage(urls[i]);
+		}
+		return this;
+
+	};
 
 
 
@@ -149,6 +181,10 @@
 
 	View.prototype.render = function() {
 
+		// Render
+		this.trigger('render');
+		View.any.trigger('render', this);
+
 		// Create a promise
 		var promise = ns.promise();
 
@@ -174,9 +210,59 @@
 
 		});
 
-
-
 		return promise;
+
+	};
+
+	View.prototype.waitForLeaveAnimation = function(waitForLeaveAnimation) {
+		this.__waitForLeaveAnimation = (waitForLeaveAnimation === undefined) ? true : waitForLeaveAnimation;
+		return this;
+	};
+
+
+	View.prototype.leave = function(newRequest) {
+
+		// Trigger the leave event and listen to what those listeners return
+		var triggerResults = this.triggerAndReturn('leave', newRequest);
+		View.any.trigger('leave', this, newRequest);
+		if (triggerResults.length > 0) {
+
+			// Check results
+			var promises = [];
+			for (var i = 0; i < triggerResults.length; i++) {
+
+				// False?
+				if (triggerResults[i] === false) {
+
+					// Then we are not leaving
+					return false;
+
+				}
+
+				// A promise?
+				if (ns.isPromise(triggerResults[i])) {
+
+					// Add to promises
+					promises.push(triggerResults[i]);
+
+				}
+
+			}
+
+			// Any promises made?
+			if (promises.length > 0) {
+
+				// Wait for them 
+				if (promises.length === 1) return promises[0];
+				var promise = ns.promise();
+				return ns.when(promises);
+
+			}
+
+		}
+		
+		// All is good, just leave.
+		return true;
 
 	};
 
@@ -196,7 +282,7 @@
 
 	// Global events.
 	View.any = new Chick.Core.TriggerClass();
-	View.any.__registerEvents(['ready']);
+	View.any.__registerEvents(['ready', 'leave', 'render']);
 
 	// Static path setter
 	View.path = 'views/';

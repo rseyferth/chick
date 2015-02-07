@@ -193,11 +193,10 @@
 
 	Router.prototype.goto = function(url) {
 
-		// Leaving route
-		if (this.activeRoute) this.activeRoute.leave();
 
 		// Clean the url
-		var request = ns.Core.Request.prototype.isPrototypeOf(url) ? url : new ns.Core.Request(url);
+		var request = ns.Core.Request.prototype.isPrototypeOf(url) ? url : new ns.Core.Request(url),
+			self = this;
 		this.lastRequest = request;
 
 		// Different language?
@@ -219,46 +218,83 @@
 
 		}
 
-		// Start loading
-		this.trigger('pageLoadStart', request.uri, request);
-		
-		// Find the matching route
-		var route = false;
-		for (var q in this.routes) {
-			if (this.routes[q].match(request)) {
+		// Setup delayed action
+		var delayedAction = ns.promise();
 
-				route = this.routes[q];
-				break;
+		// Leaving route
+		if (this.activeRoute) {
+
+			// Ask to leave the route
+			var leaveResult = this.activeRoute.leave(request);
+
+			// Failed?
+			if (leaveResult === false) {
+				return;
+			} else if (ns.isPromise(leaveResult)) {
+
+				// Wait for this.
+				leaveResult.then(function() {
+					delayedAction.resolve();
+				});
+
+			} else {
+
+				// We continue at once.
+				delayedAction.resolve();
 
 			}
-		}
-
-		// Found anything?
-		if (route === false) {
-
-			// Throw the error
-			this.trigger('error', 404);
-			this.trigger('pageNotFound');
 
 		} else {
 
-			// Store route
-			this.activeRoute = route;
-
-			// Execute the route
-			var router = this;
-			route.execute(request).then(function(result) {
-
-				// Done.
-				router.trigger('pageLoadComplete', result);
-
-			}).fail(function(result) {
-				router.trigger('error', result);
-			});
-
+			// We continue at once.
+			delayedAction.resolve();
 
 		}
 
+		// When event handling has completed
+		delayedAction.then(function() {
+
+			// Start loading
+			self.trigger('pageLoadStart', request.uri, request);
+			
+			// Find the matching route
+			var route = false;
+			for (var q in self.routes) {
+				if (self.routes[q].match(request)) {
+
+					route = self.routes[q];
+					break;
+
+				}
+			}
+
+			// Found anything?
+			if (route === false) {
+
+				// Throw the error
+				self.trigger('error', 404);
+				self.trigger('pageNotFound');
+
+			} else {
+
+				// Store route
+				self.activeRoute = route;
+
+				// Execute the route
+				route.execute(request).then(function(result) {
+
+					// Done.
+					self.trigger('pageLoadComplete', result);
+
+				}).fail(function(result) {
+					self.trigger('error', result);
+				});
+
+
+			}
+
+
+		});
 
 	};
 

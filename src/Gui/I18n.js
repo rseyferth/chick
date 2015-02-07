@@ -85,9 +85,6 @@
 
 
 
-		// Split on ,
-
-
 	};
 
 	I18n.replaceLocations = function(str) {

@@ -36,6 +36,29 @@
 		this.__callbacksOnce[eventName] = [];
 		return this;
 	};
+
+	TriggerClass.prototype.triggerAndReturn = function(eventName) {
+
+		var args = [];
+		if (arguments.length > 1) {
+			for (var i = 1; i < arguments.length; i++) {
+				args.push(arguments[i]);
+			}
+		}
+		var instance = this,
+			results = [];
+		_.each(this.__callbacks[eventName], function(callback) {
+			results.push(callback.apply(instance, args));
+		});
+		_.each(this.__callbacksOnce[eventName], function(callback) {
+			results.push(callback.apply(instance, args));
+		});
+		this.__callbacksOnce[eventName] = [];
+		return results.filter(function(item) { return item !== undefined; });
+
+
+	};
+
 	TriggerClass.prototype.__registerEvents = function(names) {
 		if (this.__callbacks === undefined)	this.__callbacks = {};
 		if (this.__callbacksOnce === undefined)	this.__callbacksOnce = {};

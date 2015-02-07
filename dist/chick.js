@@ -181,6 +181,29 @@ if (window.console === undefined) {
 		this.__callbacksOnce[eventName] = [];
 		return this;
 	};
+
+	TriggerClass.prototype.triggerAndReturn = function(eventName) {
+
+		var args = [];
+		if (arguments.length > 1) {
+			for (var i = 1; i < arguments.length; i++) {
+				args.push(arguments[i]);
+			}
+		}
+		var instance = this,
+			results = [];
+		_.each(this.__callbacks[eventName], function(callback) {
+			results.push(callback.apply(instance, args));
+		});
+		_.each(this.__callbacksOnce[eventName], function(callback) {
+			results.push(callback.apply(instance, args));
+		});
+		this.__callbacksOnce[eventName] = [];
+		return results.filter(function(item) { return item !== undefined; });
+
+
+	};
+
 	TriggerClass.prototype.__registerEvents = function(names) {
 		if (this.__callbacks === undefined)	this.__callbacks = {};
 		if (this.__callbacksOnce === undefined)	this.__callbacksOnce = {};
@@ -984,12 +1007,17 @@ if (window.console === undefined) {
 
 	};
 
-	Route.prototype.leave = function() {
+	Route.prototype.leave = function(newRequest) {
 
 		// Did we have a view?
 		if (this.view) {
-			this.view.trigger('leave');
+
+			// Wait for the outro to complete?
+			return this.view.leave(newRequest);			
+
 		}
+
+		return true;
 
 
 	};
@@ -1280,11 +1308,10 @@ if (window.console === undefined) {
 
 	Router.prototype.goto = function(url) {
 
-		// Leaving route
-		if (this.activeRoute) this.activeRoute.leave();
 
 		// Clean the url
-		var request = ns.Core.Request.prototype.isPrototypeOf(url) ? url : new ns.Core.Request(url);
+		var request = ns.Core.Request.prototype.isPrototypeOf(url) ? url : new ns.Core.Request(url),
+			self = this;
 		this.lastRequest = request;
 
 		// Different language?
@@ -1306,46 +1333,83 @@ if (window.console === undefined) {
 
 		}
 
-		// Start loading
-		this.trigger('pageLoadStart', request.uri, request);
-		
-		// Find the matching route
-		var route = false;
-		for (var q in this.routes) {
-			if (this.routes[q].match(request)) {
+		// Setup delayed action
+		var delayedAction = ns.promise();
 
-				route = this.routes[q];
-				break;
+		// Leaving route
+		if (this.activeRoute) {
+
+			// Ask to leave the route
+			var leaveResult = this.activeRoute.leave(request);
+
+			// Failed?
+			if (leaveResult === false) {
+				return;
+			} else if (ns.isPromise(leaveResult)) {
+
+				// Wait for this.
+				leaveResult.then(function() {
+					delayedAction.resolve();
+				});
+
+			} else {
+
+				// We continue at once.
+				delayedAction.resolve();
 
 			}
-		}
-
-		// Found anything?
-		if (route === false) {
-
-			// Throw the error
-			this.trigger('error', 404);
-			this.trigger('pageNotFound');
 
 		} else {
 
-			// Store route
-			this.activeRoute = route;
-
-			// Execute the route
-			var router = this;
-			route.execute(request).then(function(result) {
-
-				// Done.
-				router.trigger('pageLoadComplete', result);
-
-			}).fail(function(result) {
-				router.trigger('error', result);
-			});
-
+			// We continue at once.
+			delayedAction.resolve();
 
 		}
 
+		// When event handling has completed
+		delayedAction.then(function() {
+
+			// Start loading
+			self.trigger('pageLoadStart', request.uri, request);
+			
+			// Find the matching route
+			var route = false;
+			for (var q in self.routes) {
+				if (self.routes[q].match(request)) {
+
+					route = self.routes[q];
+					break;
+
+				}
+			}
+
+			// Found anything?
+			if (route === false) {
+
+				// Throw the error
+				self.trigger('error', 404);
+				self.trigger('pageNotFound');
+
+			} else {
+
+				// Store route
+				self.activeRoute = route;
+
+				// Execute the route
+				route.execute(request).then(function(result) {
+
+					// Done.
+					self.trigger('pageLoadComplete', result);
+
+				}).fail(function(result) {
+					self.trigger('error', result);
+				});
+
+
+			}
+
+
+		});
 
 	};
 
@@ -1805,9 +1869,6 @@ Chick.api = function() {
 
 
 
-		// Split on ,
-
-
 	};
 
 	I18n.replaceLocations = function(str) {
@@ -1948,14 +2009,46 @@ Chick.api = function() {
 		this.template = null;
 		this.__loadPromise = undefined;
 		this.__waitFor = [];
+		this.__waitForLeaveAnimation = false;
 		
 		this.$element = $('<div class="view"></div>').addClass(inflection.dasherize(source).replace('/', '-'));
 
-		this.__registerEvents(['ready', 'leave']);
+		this.__registerEvents(['ready', 'leave', 'render']);
 
 	}
 	ns.register('Gui.View', ns.Core.TriggerClass, View);
 	
+
+
+	View.prototype.preloadImage = function(url) {
+
+		// Create loader
+		var promise = ns.promise();
+		$('<img/>')
+			.on('load', function(){
+				promise.resolve();
+			})
+			.on('error', function() {
+				promise.resolve();
+				throw 'Could not find image: ' + url;
+			})
+			.attr('src', url);
+		
+		// Add to waits
+		this.__waitFor.push(promise);
+		return this;
+
+	};
+
+	View.prototype.preloadImages = function(urls) {
+
+		// Loop
+		for (var i in urls) {
+			this.preloadImage(urls[i]);
+		}
+		return this;
+
+	};
 
 
 
@@ -2088,6 +2181,10 @@ Chick.api = function() {
 
 	View.prototype.render = function() {
 
+		// Render
+		this.trigger('render');
+		View.any.trigger('render', this);
+
 		// Create a promise
 		var promise = ns.promise();
 
@@ -2113,9 +2210,59 @@ Chick.api = function() {
 
 		});
 
-
-
 		return promise;
+
+	};
+
+	View.prototype.waitForLeaveAnimation = function(waitForLeaveAnimation) {
+		this.__waitForLeaveAnimation = (waitForLeaveAnimation === undefined) ? true : waitForLeaveAnimation;
+		return this;
+	};
+
+
+	View.prototype.leave = function(newRequest) {
+
+		// Trigger the leave event and listen to what those listeners return
+		var triggerResults = this.triggerAndReturn('leave', newRequest);
+		View.any.trigger('leave', this, newRequest);
+		if (triggerResults.length > 0) {
+
+			// Check results
+			var promises = [];
+			for (var i = 0; i < triggerResults.length; i++) {
+
+				// False?
+				if (triggerResults[i] === false) {
+
+					// Then we are not leaving
+					return false;
+
+				}
+
+				// A promise?
+				if (ns.isPromise(triggerResults[i])) {
+
+					// Add to promises
+					promises.push(triggerResults[i]);
+
+				}
+
+			}
+
+			// Any promises made?
+			if (promises.length > 0) {
+
+				// Wait for them 
+				if (promises.length === 1) return promises[0];
+				var promise = ns.promise();
+				return ns.when(promises);
+
+			}
+
+		}
+		
+		// All is good, just leave.
+		return true;
 
 	};
 
@@ -2135,7 +2282,7 @@ Chick.api = function() {
 
 	// Global events.
 	View.any = new Chick.Core.TriggerClass();
-	View.any.__registerEvents(['ready']);
+	View.any.__registerEvents(['ready', 'leave', 'render']);
 
 	// Static path setter
 	View.path = 'views/';
