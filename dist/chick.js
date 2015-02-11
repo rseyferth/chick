@@ -2050,6 +2050,39 @@ Chick.api = function() {
 
 	};
 
+	View.prototype.withJson = function(keyOrUrl, urlOrNull) {
+
+		// Was a key given?
+		var url = keyOrUrl,
+			key = false;
+		if (urlOrNull !== undefined) {
+			url = urlOrNull;
+			key = keyOrUrl;
+		}
+
+		// Get the URL
+		var promise = ns.promise(),
+			view = this;
+		$.ajax({
+			url: url
+		}).then(function(result) {
+
+			// Store it.
+			if (key) {
+				view.data[key] = result;
+			} else {
+				view.data = result;
+			}
+			promise.resolve();
+
+		});
+
+		// Add promise and be done.
+		this.__waitFor.push(promise);
+		return this;
+
+	};
+
 
 
 	View.prototype.withData = function(dataOrKey, dataOrNull, customResolver) {
