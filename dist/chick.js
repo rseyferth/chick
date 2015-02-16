@@ -2011,7 +2011,7 @@ Chick.api = function() {
 		this.__waitFor = [];
 		this.__waitForLeaveAnimation = false;
 		
-		this.$element = $('<div class="view"></div>').addClass(inflection.dasherize(source).replace('/', '-'));
+		this.$element = $('<div class="view"></div>').addClass(inflection.dasherize(source).split('\/').join('-'));
 
 		this.__registerEvents(['ready', 'leave', 'render']);
 
