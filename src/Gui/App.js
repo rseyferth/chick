@@ -230,7 +230,32 @@
 
 		// Resize
 		var app = this;
-		$(window).on('resize', function() { app.__onResize(); });
+		//$(window).on('resize', function() { app.__onResize(); });
+		var lastWidth, lastHeight,
+			resizeTimeout = false;
+		window.setInterval(function() {
+
+
+			var isChanged = false;
+			if (window.innerWidth !== lastWidth) {
+				lastWidth = window.innerWidth;
+				isChanged = true;
+			}
+			if (window.innerHeight !== lastHeight) {
+				lastHeight = window.innerHeight;
+				isChanged = true;
+			}
+			if (isChanged) {
+				if (resizeTimeout !== false) {
+					window.clearTimeout(resizeTimeout);
+				}
+				resizeTimeout = window.setTimeout(function() {
+					app.__onResize();
+					resizeTimeout = false;
+				}, 50);
+			}
+
+		}, 25);
 
 	};
 
@@ -241,8 +266,10 @@
 
 	App.prototype.__onResize = function() {
 
-		// Trigger
-		this.trigger('resize');
+		// Trigger it with a little delay
+		var app = this;
+		app.trigger('resize');
+		
 
 	};
 
