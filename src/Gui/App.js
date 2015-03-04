@@ -290,6 +290,11 @@
 	// Add a url function
 	ns.url = function(path) {
 
+		// Is it an anchor link?
+		if (path[0] === '#') {
+			path = ns.app.router.lastRequest.uri + path;
+		}
+
 		// Base url.
 		var url = ns.app.settings.baseUrl;
 		if (url === '/') url = '';
@@ -303,5 +308,7 @@
 		return url + path;
 
 	};
+
+
 
 })(Chick);

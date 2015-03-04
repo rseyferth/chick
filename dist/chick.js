@@ -327,7 +327,11 @@ if (window.console === undefined) {
 	}
 
 	ns.register('Core.Model', Model);
-	
+
+
+	// Register models NS
+	if (ns.Models === undefined) ns.Models = {};
+
 
 	Model.prototype.deserialize = function(data) {
 
@@ -816,6 +820,7 @@ if (window.console === undefined) {
 		this.data = {};
 		this.method = 'get';
 		this.language = false;
+		this.anchor = false;
 		
 		// Make sure it's string, not a Location instance
 		if (typeof url !== 'string') url = '' + url;
@@ -858,7 +863,6 @@ if (window.console === undefined) {
 			}
 
 
-
 			// We call GET requests with query-data a POST request.
 			this.method = 'post';
 
@@ -866,6 +870,14 @@ if (window.console === undefined) {
 			url = url.substr(0, queryIndex);
 
 		}
+
+		// Anchors?
+		var anchorParts = url.split(/#/);
+		if (anchorParts.length > 1) {
+			url = anchorParts[0];
+			this.anchor = anchorParts[1];
+		}
+
 
 		// Store full path
 		this.fullPath = url;
@@ -1158,7 +1170,7 @@ if (window.console === undefined) {
 			ns.registerContentProcessor(function($target) {
 
 				// Navigate
-				var $btns = $target.find('a').not('[href^="http"]').not('[href=#]').not('[href^="//"]');
+				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]');
 				$btns.on('click', function(e) {
 					e.preventDefault();
 					if (!Modernizr.touch) {
@@ -1454,7 +1466,8 @@ var ns = Chick.register('Net.Api', {
 	config: {
 
 		baseUrl: '/api/v1',
-		key: ''
+		key: '',
+		urlSuffix: ''
 
 	},
 
@@ -1484,7 +1497,7 @@ var ns = Chick.register('Net.Api', {
 
 	createUrl: function(path) {
 
-		var url = this.config.baseUrl + path;
+		var url = this.config.baseUrl + path + this.config.urlSuffix;
 		return url;
 
 	},
@@ -2707,6 +2720,11 @@ Chick.api = function() {
 	// Add a url function
 	ns.url = function(path) {
 
+		// Is it an anchor link?
+		if (path[0] === '#') {
+			path = ns.app.router.lastRequest.uri + path;
+		}
+
 		// Base url.
 		var url = ns.app.settings.baseUrl;
 		if (url === '/') url = '';
@@ -2720,5 +2738,7 @@ Chick.api = function() {
 		return url + path;
 
 	};
+
+
 
 })(Chick);

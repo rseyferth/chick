@@ -5,7 +5,8 @@ var ns = Chick.register('Net.Api', {
 	config: {
 
 		baseUrl: '/api/v1',
-		key: ''
+		key: '',
+		urlSuffix: ''
 
 	},
 
@@ -35,7 +36,7 @@ var ns = Chick.register('Net.Api', {
 
 	createUrl: function(path) {
 
-		var url = this.config.baseUrl + path;
+		var url = this.config.baseUrl + path + this.config.urlSuffix;
 		return url;
 
 	},

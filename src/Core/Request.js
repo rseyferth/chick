@@ -14,6 +14,7 @@
 		this.data = {};
 		this.method = 'get';
 		this.language = false;
+		this.anchor = false;
 		
 		// Make sure it's string, not a Location instance
 		if (typeof url !== 'string') url = '' + url;
@@ -56,7 +57,6 @@
 			}
 
 
-
 			// We call GET requests with query-data a POST request.
 			this.method = 'post';
 
@@ -64,6 +64,14 @@
 			url = url.substr(0, queryIndex);
 
 		}
+
+		// Anchors?
+		var anchorParts = url.split(/#/);
+		if (anchorParts.length > 1) {
+			url = anchorParts[0];
+			this.anchor = anchorParts[1];
+		}
+
 
 		// Store full path
 		this.fullPath = url;

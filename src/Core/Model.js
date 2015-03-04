@@ -8,7 +8,11 @@
 	}
 
 	ns.register('Core.Model', Model);
-	
+
+
+	// Register models NS
+	if (ns.Models === undefined) ns.Models = {};
+
 
 	Model.prototype.deserialize = function(data) {
 
