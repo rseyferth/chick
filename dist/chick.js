@@ -736,6 +736,14 @@ if (window.console === undefined) {
 
 	};
 
+	Collection.prototype.findBy = function(attribute, value) {
+
+		return _.find(this.__records, function(item) {
+			return item.get(attribute) === value;
+		});
+
+	};
+
 
 	Collection.prototype.listUnique = function(valueAttribute) {
 
@@ -1586,7 +1594,7 @@ Chick.api = function() {
 		}, ajaxOptions || {});
 		
 		options = _.extend({
-			allowCache: true,
+			allowCache: false,
 			cacheExpire: undefined,
 			model: false,
 			handleErrors: true
@@ -2149,12 +2157,26 @@ Chick.api = function() {
 	View.prototype.withCollection = function(key, apiCallOrCollection, processCallback) {
 
 		// Add as data with a custom resolver to return the collection instead of APIResult
+		var view = this;
 		return this.withData(key, apiCallOrCollection, function(promise, data) {
 
 			// Process
 			var records = data.records;
 			if (processCallback !== undefined) {
-				var result = processCallback(records);
+			
+				// Run the callback
+				var result = processCallback.apply(view, [records]);
+
+				// A false!?
+				if (result === false) {
+
+					// 404.
+					ns.app.abort(404);
+					return;
+
+				}
+
+				// Result given? Then replace it
 				if (result !== undefined) records = result;
 			}
 

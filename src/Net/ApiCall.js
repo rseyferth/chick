@@ -33,7 +33,7 @@
 		}, ajaxOptions || {});
 		
 		options = _.extend({
-			allowCache: true,
+			allowCache: false,
 			cacheExpire: undefined,
 			model: false,
 			handleErrors: true

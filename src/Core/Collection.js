@@ -92,6 +92,14 @@
 
 	};
 
+	Collection.prototype.findBy = function(attribute, value) {
+
+		return _.find(this.__records, function(item) {
+			return item.get(attribute) === value;
+		});
+
+	};
+
 
 	Collection.prototype.listUnique = function(valueAttribute) {
 
