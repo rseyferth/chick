@@ -744,6 +744,43 @@ if (window.console === undefined) {
 
 	};
 
+	Collection.prototype.filter = function(objOrCallback) {
+
+		// Create a new collection
+		var result = new Collection(this.modelClass);
+
+		// Loop through items.
+		for (var q = 0; q < this.__records.length; q++) {
+			
+			// Callback or object?
+			if (typeof objOrCallback === 'function') {
+
+				// True or false?
+				if (objOrCallback(this.__records[q]) === true) result.add(this.__records[q]);
+
+			} else {
+
+				// Check each variable in the obj
+				var match = true;
+				for (var attr in objOrCallback) {
+					var value = this.__records[q].get(attr);
+					if (value !== objOrCallback[attr]) {
+						match = false;
+						break;
+					}
+				}
+				
+				// Matched?
+				if (match) result.add(this.__records[q]);
+
+			}
+		}
+
+
+		return result;
+
+	};
+
 
 	Collection.prototype.listUnique = function(valueAttribute) {
 
