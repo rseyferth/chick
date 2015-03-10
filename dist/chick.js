@@ -1215,7 +1215,7 @@ if (window.console === undefined) {
 			ns.registerContentProcessor(function($target) {
 
 				// Navigate
-				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]');
+				var $btns = $target.find('a').not('[href^="http"]').not('[href^="mailto:"]').not('[href^="#"]').not('[href^="//"]');
 				$btns.on('click', function(e) {
 					e.preventDefault();
 					if (!Modernizr.touch) {
