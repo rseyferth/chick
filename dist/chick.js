@@ -2522,6 +2522,10 @@ Chick.api = function() {
 
 			},
 
+			router: {
+
+			},
+
 			languageInUrl: true,
 
 			debug: true
@@ -2547,9 +2551,8 @@ Chick.api = function() {
 		this.$app.addClass(this.settings.classes.app);
 
 		// Create a router
-		this.router = new ns.Core.Router({
-			baseUrl: this.settings.baseUrl
-		});
+		if (this.settings.router.baseUrl === undefined) this.settings.router.baseUrl  = this.settings.baseUrl;
+		this.router = new ns.Core.Router(this.settings.router);
 		this.router.on('error', function(code) {
 			app.handleError(code);
 		});
