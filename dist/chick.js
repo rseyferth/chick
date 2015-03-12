@@ -1176,7 +1176,7 @@ if (window.console === undefined) {
 	function Router(options) {
 	
 		// Register my events
-		this.__registerEvents(['pageLoadStart', 'pageLoadComplete', 'error', 'pageNotFound', 'selectLanguage']);
+		this.__registerEvents(['pageLoadStart', 'pageLoadComplete', 'error', 'pageNotFound', 'selectLanguage', 'anchorChange']);
 
 		// The default options
 		this.settings = ns.extend({
@@ -1185,7 +1185,10 @@ if (window.console === undefined) {
 			catchLinks: true,
 			catchForms: true,
 			languages: false,
-			refreshOnLanguageSwitch: true
+			refreshOnLanguageSwitch: true,
+
+			animateToAnchors: true
+
 
 
 		}, options);
@@ -1201,13 +1204,22 @@ if (window.console === undefined) {
 		// Register history listener
 		var router = this;
 		History.Adapter.bind(window, 'statechange', function() {
-			
 			var state = History.getState();
 
 			// Goto that url
 			router.goto(state.cleanUrl);
 
 		});
+
+		// Hash change too.
+		History.Adapter.bind(window, 'anchorchange', function() {
+		
+			// Find the item in the page
+			var anchor = History.getHash();
+			router.trigger('anchorChange', anchor);
+			
+		});
+			
 
 		// Register content enabler
 		if (this.settings.catchLinks) {
@@ -1232,7 +1244,6 @@ if (window.console === undefined) {
 							History.pushState(null, null, $(el).attr('href'));
 						});
 					});
-
 
 				}
 
