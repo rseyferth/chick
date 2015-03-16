@@ -46,11 +46,11 @@
 				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]');
 				$btns.on('click', function(e) {
 					e.preventDefault();
-					if (!Modernizr.touch) {
+				//	if (!Modernizr.touch) {
 						History.pushState(null, null, $(this).attr('href'));
-					}
+				//	}
 				});
-
+/*
 				// For mobile, register the tap events
 				if (Modernizr.touch) {
 
@@ -63,7 +63,7 @@
 
 
 				}
-
+*/
 
 			});
 
