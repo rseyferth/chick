@@ -51,10 +51,15 @@
 				// Navigate
 				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]').not('[target]');
 				$btns.on('click', function(e) {
+
+					// Link with extension?
+					var href = $(this).attr('href');
+					if (/\.([a-z]{2,4})$/.test(href)) return;
+
+					// Do internal navigation
 					e.preventDefault();
-				//	if (!Modernizr.touch) {
-						History.pushState(null, null, $(this).attr('href'));
-				//	}
+					History.pushState(null, null, href);
+					
 				});
 /*
 				// For mobile, register the tap events
