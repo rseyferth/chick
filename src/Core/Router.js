@@ -36,6 +36,12 @@
 			router.goto(state.cleanUrl);
 
 		});
+		History.Adapter.bind(window, 'anchorchange', function() {	
+			
+			router.trigger('anchorChange', History.getHash());
+
+		});
+
 
 		// Register content enabler
 		if (this.settings.catchLinks) {
@@ -43,7 +49,7 @@
 			ns.registerContentProcessor(function($target) {
 
 				// Navigate
-				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]');
+				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]').not('[target]');
 				$btns.on('click', function(e) {
 					e.preventDefault();
 				//	if (!Modernizr.touch) {
