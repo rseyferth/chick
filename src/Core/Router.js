@@ -4,7 +4,7 @@
 	function Router(options) {
 	
 		// Register my events
-		this.__registerEvents(['pageLoadStart', 'pageLoadComplete', 'error', 'pageNotFound', 'selectLanguage']);
+		this.__registerEvents(['pageLoadStart', 'pageLoadComplete', 'error', 'pageNotFound', 'selectLanguage', 'anchorChange']);
 
 		// The default options
 		this.settings = ns.extend({
