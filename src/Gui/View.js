@@ -1,10 +1,13 @@
 'use strict';
 (function(ns) {
 
-	function View(source) {
+	function View(source, method, requestData) {
 	
-		this.data = {};
+		this.method = method === undefined ? 'get' : method;
+		this.requestData = requestData === undefined ? {} : requestData;
 		this.source = source;
+		
+		this.data = {}; 
 
 		this.template = null;
 		this.__loadPromise = undefined;
@@ -207,7 +210,9 @@
 		// Load the file
 		var view = this;
 		$.ajax({
-			url: View.path + this.source + '.jt'
+			url: View.path + this.source + View.defaultSuffix,
+			data: this.requestData,
+			method: this.method
 		}).then(function(result) {
 	
 			// Create the tempalte
@@ -318,10 +323,10 @@
 
 
 	// Static instantiator
-	View.make = function(source) {
+	View.make = function(source, method, data) {
 
 		// Create it
-		var view = new View(source);
+		var view = new View(source, method, data);
 
 		return view;
 
@@ -333,6 +338,7 @@
 
 	// Static path setter
 	View.path = 'views/';
+	View.defaultSuffix = '.jt';
 
 
 

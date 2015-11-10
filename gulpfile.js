@@ -33,7 +33,7 @@ gulp.task('js', function() {
 	        'src/Gui/I18n.js',
 	        'src/Gui/Template.js',
 	        'src/Gui/View.js',
-	        'src/Gui/Interface.js',
+	        'src/Gui/ViewContainer.js',
 	        'src/Gui/App.js'	        
 		])
 		.pipe(jshint())

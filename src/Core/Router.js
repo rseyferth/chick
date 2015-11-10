@@ -12,15 +12,14 @@
 			baseUrl: '/',
 			catchLinks: true,
 			catchForms: true,
-			languages: false,
-			refreshOnLanguageSwitch: true
-
-
+			controllerNamespace: null
+			
 		}, options);
 
 		// Localize some settings
 		this.baseUrl = this.settings.baseUrl.replace(/\/$/, '');
 		this.languageRegex = false;
+		this.controllerNamespace = this.settings.controllerNamespace;
 
 		// Main variables
 		this.routes = [];
@@ -46,25 +45,8 @@
 				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]');
 				$btns.on('click', function(e) {
 					e.preventDefault();
-				//	if (!Modernizr.touch) {
-						History.pushState(null, null, $(this).attr('href'));
-				//	}
+					History.pushState(null, null, router.baseUrl + $(this).attr('href'));
 				});
-/*
-				// For mobile, register the tap events
-				if (Modernizr.touch) {
-
-					$btns.each(function(index, el) {
-						var hammer = new Hammer(el);
-						hammer.on('tap', function(e) {
-							History.pushState(null, null, $(el).attr('href'));
-						});
-					});
-
-
-				}
-*/
-
 			});
 
 		}
@@ -113,14 +95,16 @@
 	// Public functions //
 	//////////////////////
 
-	Router.prototype.get = function(pattern, options) {
+	Router.prototype.get = function(pattern, actions, options) {
+		if (options === undefined) options = {};
 		options.method = 'get';
-		return this.add(pattern,options);
+		return this.add(pattern, actions, options);
 	};
 
-	Router.prototype.post = function(pattern, options) {
+	Router.prototype.post = function(pattern, actions, options) {
+		if (options === undefined) options = {};
 		options.method = 'post';
-		return this.add(pattern,options);
+		return this.add(pattern, actions, options);
 	};
 
 
@@ -154,11 +138,19 @@
 	};
 
 
-	Router.prototype.add = function(pattern, options) {
+	Router.prototype.add = function(pattern, actions, options) {
 
 		// Create the route
-		var route = new ns.Core.Route(pattern, options);
-		this.routes.push(route);
+		var route = new ns.Core.Route(pattern, actions, options);
+		
+		// Add to main routes
+		this.routes.push(route);			
+		
+		// Is it a subRoute?
+		if (route.parentRoute !== false) {
+			route.parentRoute.subRoutes.push(route);
+		}
+
 		return route;
 
 	};
@@ -192,7 +184,6 @@
 
 
 	Router.prototype.goto = function(url) {
-
 
 		// Clean the url
 		var request = ns.Core.Request.prototype.isPrototypeOf(url) ? url : new ns.Core.Request(url),

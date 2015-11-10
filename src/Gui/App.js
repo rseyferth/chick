@@ -22,19 +22,7 @@
 				bundles: []
 			},
 
-			classes: {
-				app: 'chick-application',
-				interface: 'chick-content'			
-			},
-
-			interface: {
-
-				
-
-			},
-
 			languageInUrl: true,
-
 			debug: true
 
 		}, options);
@@ -54,15 +42,12 @@
 		this.$container = this.$app.parent();
 		this.$document = $(document);
 
-		// Add the app class
-		this.$app.addClass(this.settings.classes.app);
-
+		// Views
+		this.viewContainers = {};
+		
 		// Create a router
 		this.router = new ns.Core.Router({
 			baseUrl: this.settings.baseUrl
-		});
-		this.router.on('error', function(code) {
-			app.handleError(code);
 		});
 
 		// Create listeners and do one resize now
@@ -71,6 +56,10 @@
 
 		// Store my instance on the namespace
 		ns.app = this;
+
+		// Find views initially
+		this.findViewContainers();
+
 
 	}
 
@@ -107,9 +96,6 @@
 			// Apply i18n
 			if (app.settings.i18n.bundles.length > 0) ns.Gui.I18n.apply($('html'));
 
-			// Create the interface
-			app.__createInterface();
-
 			// We're all done			
 			app.trigger('ready');
 
@@ -125,6 +111,62 @@
 
 	};
 
+
+	App.prototype.findViewContainers = function($target) {
+
+		var self = this;
+
+		// All docu?
+		if ($target === undefined) $target = this.$body;
+
+		// Find <view> tags
+		var foundViews = {};
+		$target.find('view, [view]').each(function(index, view) {
+			
+			// Register
+			var $view = $(view),
+				name = $view.is('view') ? $view.attr('name') : $view.attr('view');
+
+			if (!name) throw 'RoutingError: You need to define the name attribute for each <view>.';
+
+			// New view?			
+			foundViews[name] = $view;
+
+		});
+
+		// Views disappeared?
+		_.each(_.difference(_.keys(this.viewContainers), _.keys(foundViews)), function(key) {
+			delete self.viewContainers[key];
+		});
+
+		// Loop and add or merge
+		_.each(foundViews, function($el, key) {
+
+			if (self.viewContainers[key] === undefined) {
+				
+				// Add it.
+				self.viewContainers[key] = new Chick.Gui.ViewContainer(key, $el);
+
+			} else {
+
+				// Set element
+				self.viewContainers[key].setTarget($el);
+
+			}
+
+		});
+
+	};
+
+	App.prototype.getViewContainer = function(key) {
+
+		// Do I know it?
+		if (this.viewContainers[key] === undefined) throw 'RoutingError: Unknown view container "' + key + '"';
+
+		return this.viewContainers[key];
+
+
+	};
 
 	App.prototype.ready = function(callback) {
 
@@ -162,6 +204,8 @@
 			var errorResult = this.__errorHandlers[code](message),
 			app = this;
 
+			throw 'ERROR HANDLING NOT IMPLEMENTED: ' + code + ': ' + message;
+/*
 			if (ns.Gui.View.prototype.isPrototypeOf(errorResult)) {
 
 				errorResult.render().then(function(result) {
@@ -175,7 +219,7 @@
 				});
 			} else {
 				this.interface.setContent(errorResult);
-			}
+			}*/
 
 		} else {
 
@@ -209,23 +253,6 @@
 	/////////////////////
 
 
-	App.prototype.__createInterface = function() {
-
-		// Interface already there?
-		this.$interface = this.$app.find('.' + this.settings.classes.interface);
-		if (this.$interface.length === 0) {
-
-			// Create the interface element
-			this.$interface = $('<div class="' + this.settings.classes.interface + '"><div>').appendTo(this.$app);
-
-		}
-
-		// Create the interface class
-		this.interface = new ns.Gui.Interface(this.$interface, this.settings.interface);
-
-
-	};
-
 	App.prototype.__createListeners = function() {
 
 		// Resize
@@ -256,6 +283,15 @@
 			}
 
 		}, 25);
+
+
+		//////////////////////////
+		// Listen to the router //
+		//////////////////////////
+
+		this.router.on('error', function(code) {
+			app.handleError(code);
+		});
 
 	};
 

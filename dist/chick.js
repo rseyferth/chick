@@ -977,23 +977,70 @@ if (window.console === undefined) {
 'use strict';
 (function(ns) {
 
-	function Route(pattern, options) {
+	var instanceCount = 0;
+
+	function Route(pattern, actions, options) {
 	
 		// Store the pattern
+		var self = this;
 		this.pattern = pattern;
 
 		// Localize the options
 		var settings = ns.extend({
-			action: 'index',
-			method: 'get'
+			actions: actions,
+			parentRoute: false,
+			abstract: false
 		}, options);
-		this.controller = settings.controller;
-		this.action = settings.action;
+
+		this.id = ++instanceCount;
 		this.method = settings.method;
-		this.view = false;
 		this.parameterRestrictions = {};
 		this.hasRestrictions = false;
+		this.parentRoute = settings.parentRoute;
+		this.subRoutes = [];
 	
+		// Parse the actions
+		this.actions = {};
+		_.each(settings.actions, function(action, viewContainerName) {
+
+			// Is it a string? (Controller@action)
+			if (typeof action === 'string') {
+
+				// Parse it.
+				var result = /^(\w+)@(\w+)$/.exec(action);
+				if (!result) {
+					throw 'Did not understand action "' + action + '". Use Controller@action format.';
+				}
+
+				// Use that
+				action = {
+					controller: result[1],
+					action: result[2]
+				};
+
+			} else {
+
+				// Default options
+				action = ns.extend({
+					action: 'index'
+				}, action);
+
+			}
+
+			// No controller?
+			if (action.controller === undefined) {
+				throw 'A route action needs a controller at the very least. Use \'ControllerName@methodAction\'.';
+			}
+
+			self.actions[viewContainerName] = action;
+
+		});
+
+		// No actions
+		if (_.size(this.actions) === 0) { 
+			throw 'A route needs at least 1 action!';
+		}
+
 	}
 
 	ns.register('Core.Route', Route);
@@ -1006,6 +1053,13 @@ if (window.console === undefined) {
 
 	Route.prototype.match = function(request) {
 
+		// Am I abstract?
+		if (this.abstract) {
+
+			// An abstract route can never be matched directly, only its subroutes
+			return false;
+
+		}
 		// Method first
 		if (typeof request === 'string') {
 			request = new ns.Core.Request(request);
@@ -1038,9 +1092,58 @@ if (window.console === undefined) {
 
 	};
 
+	
+	Route.prototype.getActions = function() {
+
+		// No parents?
+		if (this.parentRoute === false) return this.actions;
+
+		// Merge with my parent.
+		return _.extend(this.parentRoute.getActions(), this.actions);
+
+	};
+
+	Route.prototype.getActionQueue = function(params) {
+
+		// Get an array of parents, and me last
+		var r = this, routes = [];
+		while (r !== false) {
+			routes.unshift(r);
+			r = r.parentRoute;
+		}
+
+		// Loop down from parents to me and add the actions
+		var queue = {};
+		for (var q = 0; q < routes.length; q++) {
+
+			// Loop through the actions
+			r = routes[q];
+			_.each(r.actions, function(action, key) {
+				
+				// Check which of the params are applicable for this route.
+				var myParams = params.slice(0, r.parameters.length);
+
+				// Set action in queue
+				queue[key] = {
+					route: r,
+					routeParams: myParams,
+					key: key,
+					action: action
+				};
+
+			});
+
+		}
+
+		return queue;
+
+	};
+
 
 	Route.prototype.execute = function(request) {
 		
+		var self = this;
+
 		// Method first
 		if (typeof request === 'string') {
 			request = new ns.Core.Request(request);
@@ -1052,15 +1155,81 @@ if (window.console === undefined) {
 		var match = this.regex.exec(request.uri),
 			params = match.slice(1, 1 + this.parameters.length);
 
-		// Create the controller
-		var ControllerClass = this.controller,
-		controller = new ControllerClass();
-		controller.setRequest(request);
-		if (controller[this.action] === undefined) throw 'The controller does not have a method ' + this.action;
+		// Combine into single promise
+		var promise = Chick.promise();
 
-		// Get the result
-		var response = controller[this.action].apply(controller, params);
-		return this.__processResponse(response);
+		// Now create a queue with actions
+		var ctrlNs = ns.app.router.controllerNamespace;
+		ctrlNs = ctrlNs ? ctrlNs + '.' : '';
+
+		var combinedResult = {},
+			actionQueue = this.getActionQueue(params),
+			queue = _.keys(actionQueue);
+
+		// Process each in order.
+		var processNext = function() {
+
+			// Done?
+			if (queue.length === 0) {
+
+				console.log('DONE', combinedResult);
+				return;
+
+			}
+
+			// Get first
+			var targetView = queue.shift(),
+				info = actionQueue[targetView],
+				action = info.action;
+
+			// Is this action necessary, or is the current content still the content for the active (parent)route
+			var viewContainer = ns.app.getViewContainer(info.key);
+			if (viewContainer.isLastSetBy(info.route, info.routeParams)) {
+
+				// Move on
+				console.log('No need.');
+				processNext();
+				return;
+
+			}
+			
+			// Find the controller class
+			var ctrl = ctrlNs + action.controller,
+				ControllerClass = Chick.arrayGet(Chick, ctrl, null);
+			if (!ControllerClass) throw 'There is no controller defined as ' + ctrl;
+			
+			// Create the controller
+			var controller = new ControllerClass();
+			controller.setRequest(request);
+			if (controller[action.action] === undefined) throw 'The controller does not have a method ' + action.action;
+
+			// Get the result and process it/
+			var response = controller[action.action].apply(controller, info.routeParams);			
+			self.__processResponse(targetView, response).then(function(result) {
+
+				// Store the result
+				combinedResult[targetView] = response;
+
+				// Trigger a actionComplete event on the router
+				ns.app.router.trigger('actionComplete', [targetView, result, this]);
+
+				///////////////////////////////////////////////////////
+				// Set the content in the appropriate view container //
+				///////////////////////////////////////////////////////
+				viewContainer.setContent(result, info.route, info.routeParams);
+				
+				// And onward.
+				processNext();
+
+			});
+
+
+		};
+		processNext();
+
+		// Done.
+		return promise;
+
 
 	};
 
@@ -1091,12 +1260,35 @@ if (window.console === undefined) {
 	};
 
 
+	Route.prototype.sub = function(callback) {
+
+		// Create some local functions
+		var self = this;
+		var obj = {
+			get: function(pattern, actions, options) {
+				if (options === undefined) options = {};
+				options.parentRoute = self;
+				return ns.app.router.get(pattern, actions, options);
+			},
+			post: function(pattern, actions, options) {
+				if (options === undefined) options = {};
+				options.parentRoute = self;
+				return ns.app.router.post(pattern, actions, options);
+			}
+		};
+
+		callback.apply(obj);
+
+	};
+
+
+
 
 	///////////////////////
 	// Private functions //
 	///////////////////////
 
-	Route.prototype.__processResponse = function(response, promise) {
+	Route.prototype.__processResponse = function(targetName, response, promise) {
 
 		// Create a promise
 		if (promise === undefined) promise = ns.promise();
@@ -1130,7 +1322,7 @@ if (window.console === undefined) {
 			// Wait for it to finish and then process it again
 			var route = this;
 			response.then(function(result) {
-				route.__processResponse(result, promise);
+				route.__processResponse(targetName, result, promise);
 			});
 			
 
@@ -1145,14 +1337,53 @@ if (window.console === undefined) {
 
 	};
 
+	Route.prototype.__getPattern = function() {
+
+		// Start with my own pattern
+		var p = this.pattern;
+
+		// Prepend any parent patterns
+		var parentRoute = this.parentRoute;
+		while (parentRoute !== false) {
+
+			// Add it.
+			p = parentRoute.pattern +  p;
+
+			// Deeper.
+			parentRoute = parentRoute.parentRoute;
+
+		}
+
+		// Done.
+		return p;
+
+	};
+
 	Route.prototype.__createRegEx = function() {
 
 		// Convert variables in pattern
 		var params = [],
-		p = this.pattern.replace(/\/:([a-zA-Z]+)/g, function(match) {
-			params.push(match.replace(/\/:/, ''));
-			return '/([-a-zA-Z0-9,]+)';
-		});
+		p = this.__getPattern()
+
+			// ":name" will match any word or multiple words
+			.replace(/\/:([a-zA-Z]+)/g, function(match) {
+				params.push(match.replace(/\/:/, ''));
+				return '/([-a-zA-Z0-9,]+)';
+			})
+
+			// as will "{name}"
+			.replace(/\/{([a-zA-Z]+)}/g, function(match) {
+				params.push(match.replace(/\/:/, ''));
+				return '/([-a-zA-Z0-9,]+)';
+			})
+
+			// "#name" will match any single number
+			.replace(/\/\#([a-zA-Z]+)/g, function(match) {
+				params.push(match.replace(/\/:/, ''));
+				return '/([0-9]+)';
+			});
+
+
 
 		// Remove trailing slash and escape 'em
 		p = p.replace(/\/$/, '');
@@ -1184,15 +1415,14 @@ if (window.console === undefined) {
 			baseUrl: '/',
 			catchLinks: true,
 			catchForms: true,
-			languages: false,
-			refreshOnLanguageSwitch: true
-
-
+			controllerNamespace: null
+			
 		}, options);
 
 		// Localize some settings
 		this.baseUrl = this.settings.baseUrl.replace(/\/$/, '');
 		this.languageRegex = false;
+		this.controllerNamespace = this.settings.controllerNamespace;
 
 		// Main variables
 		this.routes = [];
@@ -1218,25 +1448,8 @@ if (window.console === undefined) {
 				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]');
 				$btns.on('click', function(e) {
 					e.preventDefault();
-				//	if (!Modernizr.touch) {
-						History.pushState(null, null, $(this).attr('href'));
-				//	}
+					History.pushState(null, null, router.baseUrl + $(this).attr('href'));
 				});
-/*
-				// For mobile, register the tap events
-				if (Modernizr.touch) {
-
-					$btns.each(function(index, el) {
-						var hammer = new Hammer(el);
-						hammer.on('tap', function(e) {
-							History.pushState(null, null, $(el).attr('href'));
-						});
-					});
-
-
-				}
-*/
-
 			});
 
 		}
@@ -1285,14 +1498,16 @@ if (window.console === undefined) {
 	// Public functions //
 	//////////////////////
 
-	Router.prototype.get = function(pattern, options) {
+	Router.prototype.get = function(pattern, actions, options) {
+		if (options === undefined) options = {};
 		options.method = 'get';
-		return this.add(pattern,options);
+		return this.add(pattern, actions, options);
 	};
 
-	Router.prototype.post = function(pattern, options) {
+	Router.prototype.post = function(pattern, actions, options) {
+		if (options === undefined) options = {};
 		options.method = 'post';
-		return this.add(pattern,options);
+		return this.add(pattern, actions, options);
 	};
 
 
@@ -1326,11 +1541,19 @@ if (window.console === undefined) {
 	};
 
 
-	Router.prototype.add = function(pattern, options) {
+	Router.prototype.add = function(pattern, actions, options) {
 
 		// Create the route
-		var route = new ns.Core.Route(pattern, options);
-		this.routes.push(route);
+		var route = new ns.Core.Route(pattern, actions, options);
+		
+		// Add to main routes
+		this.routes.push(route);			
+		
+		// Is it a subRoute?
+		if (route.parentRoute !== false) {
+			route.parentRoute.subRoutes.push(route);
+		}
+
 		return route;
 
 	};
@@ -1364,7 +1587,6 @@ if (window.console === undefined) {
 
 
 	Router.prototype.goto = function(url) {
-
 
 		// Clean the url
 		var request = ns.Core.Request.prototype.isPrototypeOf(url) ? url : new ns.Core.Request(url),
@@ -2059,10 +2281,13 @@ Chick.api = function() {
 'use strict';
 (function(ns) {
 
-	function View(source) {
+	function View(source, method, requestData) {
 	
-		this.data = {};
+		this.method = method === undefined ? 'get' : method;
+		this.requestData = requestData === undefined ? {} : requestData;
 		this.source = source;
+		
+		this.data = {}; 
 
 		this.template = null;
 		this.__loadPromise = undefined;
@@ -2265,7 +2490,9 @@ Chick.api = function() {
 		// Load the file
 		var view = this;
 		$.ajax({
-			url: View.path + this.source + '.jt'
+			url: View.path + this.source + View.defaultSuffix,
+			data: this.requestData,
+			method: this.method
 		}).then(function(result) {
 	
 			// Create the tempalte
@@ -2376,10 +2603,10 @@ Chick.api = function() {
 
 
 	// Static instantiator
-	View.make = function(source) {
+	View.make = function(source, method, data) {
 
 		// Create it
-		var view = new View(source);
+		var view = new View(source, method, data);
 
 		return view;
 
@@ -2391,6 +2618,7 @@ Chick.api = function() {
 
 	// Static path setter
 	View.path = 'views/';
+	View.defaultSuffix = '.jt';
 
 
 
@@ -2399,88 +2627,82 @@ Chick.api = function() {
 'use strict';
 (function(ns) {
 
-	function Interface($target, options) {
+	function ViewContainer(name, $target) {
+	
+		// Localize
+		var self = this;
+		this.name = name;
+		this.$target = $target;
 
-		// Defaultification
-		this.settings = ns.extend({
+		this.lastSetByRoute = false;
+		this.lastSetByRouteParams = false;
 
-			selectors: {
-				template: 'script[type="text/html"]',
-			},
 
-			classes: {
-				loading: 'loading',
-				content: 'view-container'
+		// Listen to router
+		Chick.app.router.on('pageLoadComplete', function(results) {
+
+			// Does it apply to me?
+			if (results[self.name] !== undefined) {
+
+				// Set content
+				self.setContent(results[self.name]);
+
 			}
 
-
-		}, options);
-
-		// Localize
-		this.$element = $target;
-
-		// Template in here already?
-		var $template = $target.find(this.settings.selectors.template);
-		if ($template.length > 0) {
-
-			// Render it
-			ns.template($template.html(), {}, $target);
-
-			// Enable the new content
-			ns.enableContent($target);
-
-		}
-
-		// Create article
-		this.$content = $target.find('.' + this.settings.classes.content);
-		if (this.$content.length === 0) {
-			this.$content = $('<div></div>').addClass(this.settings.classes.content).appendTo($target);
-		}
-		
-		// Loading element
-		this.$loading = $('<div class="' + this.settings.classes.loading + '"></div>');
-
-
-		// Listen to the router
-		var face = this;
-		ns.app.router.on('pageLoadStart', function() {
-
-			face.setLoading();
-
-		}).on('pageLoadComplete', function(result) {
-
-			face.setContent(result);
-		
 		});
 
-
-
 	}
-	ns.register('Gui.Interface', Interface);
+	ns.register('Gui.ViewContainer', ns.Core.TriggerClass, ViewContainer);
+	
 
 
+	ViewContainer.prototype.setTarget = function($el) {
 
-	Interface.prototype.setLoading = function(isLoading) {
-		if (isLoading === false) {
-			this.$loading.remove();
-		} else {
-			this.$loading.insertAfter(this.$content);
-		}
+		// Set it
+		this.$target = $el;
+
+		// That means we can assume that this will have to be reset by another route.
+		this.lastSetByRoute = false;
+		this.lastSetByRouteParams = false;
+
+	};
+
+	ViewContainer.prototype.setContent = function(html, byRoute, byRouteParams) {
+
+		// Store last route (this is to check whether the viewcontainer needs a refresh is a sub-page is loaded)
+		this.lastSetByRoute = byRoute;
+		this.lastSetByRouteParams = byRouteParams;
+
+		// Set it.
+		this.$target.html(html);
+
+		// Process it.
+		Chick.enableContent(this.$target);
+
+		// Update view containers
+		Chick.app.findViewContainers();
+
 	};
 
 
-	Interface.prototype.setContent = function(result, noLongerLoading) {
+	ViewContainer.prototype.isLastSetBy = function(byRoute, byRouteParams) {
 
-		// Replace content
-		this.$content.html(result).removeClass(this.settings.classes.loading);
+		// Not set before?
+		if (this.lastSetByRoute === false) return false;
 
-		// Scroll up
-		this.$content.scrollTop(0);
+		// Check route id.
+		if (byRoute.id === this.lastSetByRoute.id) {
 
-		// Stop loading?
-		if (noLongerLoading !== false) {
-			this.setLoading(false);
+			// Compare the parameters.
+			if (JSON.stringify(byRouteParams) === JSON.stringify(this.lastSetByRouteParams)) {
+				return true;
+			}
+
 		}
+
+		// Nope. This is a different route
+		return false;
+
 
 	};
 
@@ -2511,19 +2733,7 @@ Chick.api = function() {
 				bundles: []
 			},
 
-			classes: {
-				app: 'chick-application',
-				interface: 'chick-content'			
-			},
-
-			interface: {
-
-				
-
-			},
-
 			languageInUrl: true,
-
 			debug: true
 
 		}, options);
@@ -2543,15 +2753,12 @@ Chick.api = function() {
 		this.$container = this.$app.parent();
 		this.$document = $(document);
 
-		// Add the app class
-		this.$app.addClass(this.settings.classes.app);
-
+		// Views
+		this.viewContainers = {};
+		
 		// Create a router
 		this.router = new ns.Core.Router({
 			baseUrl: this.settings.baseUrl
-		});
-		this.router.on('error', function(code) {
-			app.handleError(code);
 		});
 
 		// Create listeners and do one resize now
@@ -2560,6 +2767,10 @@ Chick.api = function() {
 
 		// Store my instance on the namespace
 		ns.app = this;
+
+		// Find views initially
+		this.findViewContainers();
+
 
 	}
 
@@ -2596,9 +2807,6 @@ Chick.api = function() {
 			// Apply i18n
 			if (app.settings.i18n.bundles.length > 0) ns.Gui.I18n.apply($('html'));
 
-			// Create the interface
-			app.__createInterface();
-
 			// We're all done			
 			app.trigger('ready');
 
@@ -2614,6 +2822,62 @@ Chick.api = function() {
 
 	};
 
+
+	App.prototype.findViewContainers = function($target) {
+
+		var self = this;
+
+		// All docu?
+		if ($target === undefined) $target = this.$body;
+
+		// Find <view> tags
+		var foundViews = {};
+		$target.find('view, [view]').each(function(index, view) {
+			
+			// Register
+			var $view = $(view),
+				name = $view.is('view') ? $view.attr('name') : $view.attr('view');
+
+			if (!name) throw 'RoutingError: You need to define the name attribute for each <view>.';
+
+			// New view?			
+			foundViews[name] = $view;
+
+		});
+
+		// Views disappeared?
+		_.each(_.difference(_.keys(this.viewContainers), _.keys(foundViews)), function(key) {
+			delete self.viewContainers[key];
+		});
+
+		// Loop and add or merge
+		_.each(foundViews, function($el, key) {
+
+			if (self.viewContainers[key] === undefined) {
+				
+				// Add it.
+				self.viewContainers[key] = new Chick.Gui.ViewContainer(key, $el);
+
+			} else {
+
+				// Set element
+				self.viewContainers[key].setTarget($el);
+
+			}
+
+		});
+
+	};
+
+	App.prototype.getViewContainer = function(key) {
+
+		// Do I know it?
+		if (this.viewContainers[key] === undefined) throw 'RoutingError: Unknown view container "' + key + '"';
+
+		return this.viewContainers[key];
+
+
+	};
 
 	App.prototype.ready = function(callback) {
 
@@ -2651,6 +2915,8 @@ Chick.api = function() {
 			var errorResult = this.__errorHandlers[code](message),
 			app = this;
 
+			throw 'ERROR HANDLING NOT IMPLEMENTED: ' + code + ': ' + message;
+/*
 			if (ns.Gui.View.prototype.isPrototypeOf(errorResult)) {
 
 				errorResult.render().then(function(result) {
@@ -2664,7 +2930,7 @@ Chick.api = function() {
 				});
 			} else {
 				this.interface.setContent(errorResult);
-			}
+			}*/
 
 		} else {
 
@@ -2698,23 +2964,6 @@ Chick.api = function() {
 	/////////////////////
 
 
-	App.prototype.__createInterface = function() {
-
-		// Interface already there?
-		this.$interface = this.$app.find('.' + this.settings.classes.interface);
-		if (this.$interface.length === 0) {
-
-			// Create the interface element
-			this.$interface = $('<div class="' + this.settings.classes.interface + '"><div>').appendTo(this.$app);
-
-		}
-
-		// Create the interface class
-		this.interface = new ns.Gui.Interface(this.$interface, this.settings.interface);
-
-
-	};
-
 	App.prototype.__createListeners = function() {
 
 		// Resize
@@ -2745,6 +2994,15 @@ Chick.api = function() {
 			}
 
 		}, 25);
+
+
+		//////////////////////////
+		// Listen to the router //
+		//////////////////////////
+
+		this.router.on('error', function(code) {
+			app.handleError(code);
+		});
 
 	};
 
