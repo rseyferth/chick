@@ -11,26 +11,15 @@
 		this.lastSetByRoute = false;
 		this.lastSetByRouteParams = false;
 
-
-		// Listen to router
-		Chick.app.router.on('pageLoadComplete', function(results) {
-
-			// Does it apply to me?
-			if (results[self.name] !== undefined) {
-
-				// Set content
-				self.setContent(results[self.name]);
-
-			}
-
-		});
-
 	}
 	ns.register('Gui.ViewContainer', ns.Core.TriggerClass, ViewContainer);
 	
 
 
 	ViewContainer.prototype.setTarget = function($el) {
+
+		// Is the element the same?
+		if ($el[0] === this.$target[0]) return;
 
 		// Set it
 		this.$target = $el;
@@ -66,7 +55,6 @@
 
 		// Check route id.
 		if (byRoute.id === this.lastSetByRoute.id) {
-
 			// Compare the parameters.
 			if (JSON.stringify(byRouteParams) === JSON.stringify(this.lastSetByRouteParams)) {
 				return true;

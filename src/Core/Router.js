@@ -4,7 +4,7 @@
 	function Router(options) {
 	
 		// Register my events
-		this.__registerEvents(['pageLoadStart', 'pageLoadComplete', 'error', 'pageNotFound', 'selectLanguage']);
+		this.__registerEvents(['navigationStart', 'navigationComplete', 'error', 'pageNotFound', 'selectLanguage', 'actionComplete']);
 
 		// The default options
 		this.settings = ns.extend({
@@ -275,7 +275,7 @@
 				route.execute(request).then(function(result) {
 
 					// Done.
-					self.trigger('pageLoadComplete', result);
+					self.trigger('navigationComplete', result);
 
 				}).fail(function(result) {
 					self.trigger('error', result);

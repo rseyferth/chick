@@ -1172,7 +1172,9 @@ if (window.console === undefined) {
 			// Done?
 			if (queue.length === 0) {
 
-				console.log('DONE', combinedResult);
+				// Finished!
+				console.log(combinedResult);
+				promise.resolve(combinedResult);
 				return;
 
 			}
@@ -1182,12 +1184,16 @@ if (window.console === undefined) {
 				info = actionQueue[targetView],
 				action = info.action;
 
-			// Is this action necessary, or is the current content still the content for the active (parent)route
-			var viewContainer = ns.app.getViewContainer(info.key);
-			if (viewContainer.isLastSetBy(info.route, info.routeParams)) {
+			//////////////////////////////////////////////////////////////////////////////////////////////////////
+			// Is this action necessary, or is the current content still the content for the active parentRoute //
+			//////////////////////////////////////////////////////////////////////////////////////////////////////
+			// This only applies for parent routes, because we want to make sure that a refresh works, by opening
+			// the same url again.
 
-				// Move on
-				console.log('No need.');
+			var viewContainer = ns.app.getViewContainer(info.key);
+			if (queue.length !== 0 && viewContainer.isLastSetBy(info.route, info.routeParams)) {
+
+				// Move on, this viewcontainer's content does not need to change.
 				processNext();
 				return;
 
@@ -1407,7 +1413,7 @@ if (window.console === undefined) {
 	function Router(options) {
 	
 		// Register my events
-		this.__registerEvents(['pageLoadStart', 'pageLoadComplete', 'error', 'pageNotFound', 'selectLanguage']);
+		this.__registerEvents(['navigationStart', 'navigationComplete', 'error', 'pageNotFound', 'selectLanguage', 'actionComplete']);
 
 		// The default options
 		this.settings = ns.extend({
@@ -1678,7 +1684,7 @@ if (window.console === undefined) {
 				route.execute(request).then(function(result) {
 
 					// Done.
-					self.trigger('pageLoadComplete', result);
+					self.trigger('navigationComplete', result);
 
 				}).fail(function(result) {
 					self.trigger('error', result);
@@ -2637,26 +2643,15 @@ Chick.api = function() {
 		this.lastSetByRoute = false;
 		this.lastSetByRouteParams = false;
 
-
-		// Listen to router
-		Chick.app.router.on('pageLoadComplete', function(results) {
-
-			// Does it apply to me?
-			if (results[self.name] !== undefined) {
-
-				// Set content
-				self.setContent(results[self.name]);
-
-			}
-
-		});
-
 	}
 	ns.register('Gui.ViewContainer', ns.Core.TriggerClass, ViewContainer);
 	
 
 
 	ViewContainer.prototype.setTarget = function($el) {
+
+		// Is the element the same?
+		if ($el[0] === this.$target[0]) return;
 
 		// Set it
 		this.$target = $el;
@@ -2692,7 +2687,6 @@ Chick.api = function() {
 
 		// Check route id.
 		if (byRoute.id === this.lastSetByRoute.id) {
-
 			// Compare the parameters.
 			if (JSON.stringify(byRouteParams) === JSON.stringify(this.lastSetByRouteParams)) {
 				return true;
