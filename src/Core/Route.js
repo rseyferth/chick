@@ -396,21 +396,27 @@
 		p = this.__getPattern()
 
 			// ":name" will match any word or multiple words
-			.replace(/\/:([a-zA-Z]+)/g, function(match) {
-				params.push(match.replace(/\/:/, ''));
+			.replace(/\/:([a-zA-Z]+)/g, function(all, param) {
+				params.push(param);
 				return '/([-a-zA-Z0-9,]+)';
 			})
 
 			// as will "{name}"
-			.replace(/\/{([a-zA-Z]+)}/g, function(match) {
-				params.push(match.replace(/\/:/, ''));
+			.replace(/\/{([a-zA-Z]+)}/g, function(all, param) {
+				params.push(param);
 				return '/([-a-zA-Z0-9,]+)';
 			})
 
-			// "#name" will match any single number
-			.replace(/\/\#([a-zA-Z]+)/g, function(match) {
-				params.push(match.replace(/\/:/, ''));
+			// "{#name}" will match any single number
+			.replace(/\/{\#([a-zA-Z]+)}/g, function(all, param) {
+				params.push(param);
 				return '/([0-9]+)';
+			})
+
+			// "{*name" will match any string, including forward-slashes
+			.replace(/\/{\*([a-zA-Z]+)}/g, function(all, param) {
+				params.push(param);
+				return '/(.+)';
 			});
 
 

@@ -30,6 +30,7 @@ gulp.task('js', function() {
 	        'src/Net/ApiCall.js',
 	        'src/Net/ApiResult.js',
 
+	        'src/Gui/Directive.js',
 	        'src/Gui/I18n.js',
 	        'src/Gui/Template.js',
 	        'src/Gui/View.js',

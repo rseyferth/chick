@@ -22,7 +22,7 @@
 				bundles: []
 			},
 
-			languageInUrl: true,
+			languageInUrl: false,
 			debug: true
 
 		}, options);
@@ -34,7 +34,7 @@
 		this.__errorHandlers = {
 
 		};
-
+		this.__defaultErrorViewContainer = 'main';
 
 		// Elements for future use
 		this.$window = $(window);
@@ -106,6 +106,8 @@
 			app.__onResize();
 
 		});
+
+
 
 		return this;
 
@@ -187,15 +189,19 @@
 
 	};
 
-	App.prototype.errors = function(errorHandlers) {
+	App.prototype.errors = function(errorHandlers, defaultErrorViewContainer) {
 
 		// Merge the errors
 		this.__errorHandlers = ns.extend(this.__errorHandlers, errorHandlers);
+		if (defaultErrorViewContainer !== undefined) this.__defaultErrorViewContainer = defaultErrorViewContainer;
 		return this;		
 
 	};
 
-	App.prototype.handleError = function(code, message) {
+	App.prototype.handleError = function(code, message, targetViewContainer) {
+
+		// Which target view
+		targetViewContainer = this.getViewContainer(targetViewContainer === undefined ? this.__defaultErrorViewContainer : targetViewContainer);
 
 		// Custom handler?
 		if (this.__errorHandlers[code] !== undefined) {
@@ -204,27 +210,26 @@
 			var errorResult = this.__errorHandlers[code](message),
 			app = this;
 
-			throw 'ERROR HANDLING NOT IMPLEMENTED: ' + code + ': ' + message;
-/*
 			if (ns.Gui.View.prototype.isPrototypeOf(errorResult)) {
 
 				errorResult.render().then(function(result) {
-					app.interface.setContent(result);
+					targetViewContainer(result);
 				});
 				
 			} else if (ns.isPromise(errorResult))  {
 				
 				errorResult.then(function(result) {
-					app.interface.setContent(result);
+					targetViewContainer.setContent(result);
 				});
+
 			} else {
-				this.interface.setContent(errorResult);
-			}*/
+				targetViewContainer.setContent(errorResult);
+			}
 
 		} else {
 
 			// Set content.
-			this.interface.setContent('Error ' + code);
+			targetViewContainer.setContent('Error ' + code);
 
 		}
 
@@ -289,8 +294,8 @@
 		// Listen to the router //
 		//////////////////////////
 
-		this.router.on('error', function(code) {
-			app.handleError(code);
+		this.router.on('error', function(code, message, targetViewContainer) {
+			app.handleError(code, message, targetViewContainer);
 		});
 
 	};

@@ -1,148 +1,241 @@
 'use strict';
-window.Chick = window.Chick || {};
+(function() {
 
-Chick.register = function(ns, dataOrParentClass, dataOrNull) {
+	window.Chick = window.Chick || {};
 
-	// Parent class used?
-	var data = dataOrNull === undefined ? dataOrParentClass : dataOrNull,
-		parentClass = dataOrNull === undefined ? false : dataOrParentClass;
+	// Enable Underscore.string extension
+	_.mixin(s.exports());
 
-	// Extending
-	if (parentClass) {
-		data.prototype = Object.create(parentClass.prototype);
-		data.prototype.constructor = data;
-	}
+	Chick.register = function(ns, dataOrParentClass, dataOrNull) {
+
+		// Parent class used?
+		var data = dataOrNull === undefined ? dataOrParentClass : dataOrNull,
+			parentClass = dataOrNull === undefined ? false : dataOrParentClass;
+
+		// Extending
+		if (parentClass) {
+			data.prototype = Object.create(parentClass.prototype);
+			data.prototype.constructor = data;
+		}
 
 
-	// Split namespace on dots
-	var parts = ns.split('.'),
-		obj = window.Chick;
-	if (parts.length > 1) {
-		for (var p = 0; p < parts.length - 1; p++) {
-			if (obj[parts[p]] === undefined) obj[parts[p]] = {};
+		// Split namespace on dots
+		var parts = ns.split('.'),
+			obj = window.Chick;
+		if (parts.length > 1) {
+			for (var p = 0; p < parts.length - 1; p++) {
+				if (obj[parts[p]] === undefined) obj[parts[p]] = {};
+				obj = obj[parts[p]];
+			}
+		}
+		obj[parts[parts.length - 1]] = data || {};
+		return obj[parts[parts.length - 1]];
+
+	};
+
+	Chick.registerController = function(ns, data) {
+		return Chick.register(ns, Chick.Core.Controller, data);
+	};
+
+	Chick.registerModel = function(ns, data) {
+		return Chick.register('Models.' + ns, Chick.Core.Model, data);
+	};
+
+
+	Chick.knows = function(ns) {
+		var obj = Chick.arrayGet(Chick, ns, false);
+		return obj !== false;
+	};
+
+	Chick.createModel = function(className, startValues) {
+		return Chick.Core.Model.create(className, startValues);
+	};
+
+
+	Chick.view = function(name) {
+		return Chick.Gui.View.make(name);
+	};
+
+
+
+	Chick.promise = function() {
+		return $.Deferred();
+	};
+	Chick.isPromise = function(obj) {
+		return typeof obj === 'object' && typeof obj.then === 'function';
+	};
+	Chick.isArray = function(obj) {
+		return $.isArray(obj);
+	};
+
+
+	Chick.when = function(promises) {	
+		return $.when.apply(null, promises);
+	};
+		
+
+	Chick.uuid = function(format) {
+
+		if (format === undefined) format = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+		var d = new Date().getTime(),
+			uuid = format.replace(/[xy]/g, function(c) {
+				var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
+				return v.toString(16);
+		});
+			return uuid;
+
+	};
+
+	Chick.extend = function() {
+		return $.extend.apply(this, arguments);
+	};
+
+
+	Chick.arrayGet = function(obj, key, def, regex) {
+
+		if (regex === undefined) regex = /\./;
+		if (def === undefined) def = '[' + key + ']';
+		var parts = key.split(regex);
+
+		for (var p in parts) {
+			if (obj[parts[p]] === undefined) return def;
 			obj = obj[parts[p]];
 		}
-	}
-	obj[parts[parts.length - 1]] = data || {};
-	return obj[parts[parts.length - 1]];
+		return obj;
 
-};
-
-Chick.registerController = function(ns, data) {
-	return Chick.register(ns, Chick.Core.Controller, data);
-};
-
-Chick.knows = function(ns) {
-	var obj = Chick.arrayGet(Chick, ns, false);
-	return obj !== false;
-};
-
-
-Chick.promise = function() {
-	return $.Deferred();
-};
-Chick.isPromise = function(obj) {
-	return typeof obj === 'object' && typeof obj.then === 'function';
-};
-Chick.isArray = function(obj) {
-	return $.isArray(obj);
-};
-
-
-Chick.when = function(promises) {	
-	return $.when.apply(null, promises);
-};
-	
-
-Chick.uuid = function(format) {
-
-	if (format === undefined) format = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
-	var d = new Date().getTime(),
-		uuid = format.replace(/[xy]/g, function(c) {
-			var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
-			return v.toString(16);
-	});
-		return uuid;
-
-};
-
-Chick.extend = function() {
-	return $.extend.apply(this, arguments);
-};
-
-
-Chick.arrayGet = function(obj, key, def, regex) {
-
-	if (regex === undefined) regex = /\./;
-	if (def === undefined) def = '[' + key + ']';
-	var parts = key.split(regex);
-
-	for (var p in parts) {
-		if (obj[parts[p]] === undefined) return def;
-		obj = obj[parts[p]];
-	}
-	return obj;
-
-};
-
-
-Chick.__contentProcessors = [];
-Chick.registerContentProcessor = function(callback) {
-	Chick.__contentProcessors.push(callback);
-};
-
-Chick.enableContent = function($target) {
-
-	for (var c in Chick.__contentProcessors) {
-		Chick.__contentProcessors[c]($target);
-	}
-
-};
-
-
-
-Chick.redirect = function(url) {
-	return new Chick.Core.Redirect(url);
-};
-
-
-
-
-
-/**
- * Polyfill for Object.create() OOP
- */
-if (typeof Object.create !== 'function') {
-	Object.create = (function() {
-		var Object = function() {};
-		return function (prototype) {
-			if (arguments.length > 1) {
-				throw new Error('Second argument not supported');
-			}
-			if (typeof prototype !== 'object') {
-				throw new TypeError('Argument must be an object');
-			}
-			Object.prototype = prototype;
-			/* jshint ignore:start */
-			var result = new Object();
-			Object.prototype = null;
-			return result;
-			/* jshint ignore:end */
-		};
-	})();
-}
-
-
-/**
- * Polyfill for Console
- */
-if (window.console === undefined) {
-	window.console = {
-		log: function() {},
-		warn: function() {},
-		error: function() {}
 	};
-}
+
+
+	Chick.__contentProcessors = [];
+	Chick.registerContentProcessor = function(callback) {
+		Chick.__contentProcessors.push(callback);
+	};
+
+	Chick.enableContent = function($target, context) {
+
+		for (var c in Chick.__contentProcessors) {
+			Chick.__contentProcessors[c]($target, context);
+		}
+
+	};
+
+
+
+	Chick.redirect = function(url) {
+		return new Chick.Core.Redirect(url);
+	};
+
+
+
+	var dot = new DotObject();
+	window.dot = dot;
+
+
+
+	/**
+	 * Polyfill for Object.create() OOP
+	 */
+	if (typeof Object.create !== 'function') {
+		Object.create = (function() {
+			var Object = function() {};
+			return function (prototype) {
+				if (arguments.length > 1) {
+					throw new Error('Second argument not supported');
+				}
+				if (typeof prototype !== 'object') {
+					throw new TypeError('Argument must be an object');
+				}
+				Object.prototype = prototype;
+				/* jshint ignore:start */
+				var result = new Object();
+				Object.prototype = null;
+				return result;
+				/* jshint ignore:end */
+			};
+		})();
+	}
+
+
+	/**
+	 * Polyfill for Console
+	 */
+	if (window.console === undefined) {
+		window.console = {
+			log: function() {},
+			warn: function() {},
+			error: function() {}
+		};
+	}
+
+
+
+	////////////////
+	// DIRECTIVES //
+	////////////////
+
+	Chick.directiveClasses = {};
+	Chick.createdDirectives = [];
+		
+
+	Chick.registerDirective = function(tag, classObj, constructor) {
+
+		// Register as class
+		classObj = Chick.register('Chick.Directives.' + _.classify(tag), Chick.Gui.Directive, classObj);
+
+		// Add constructor
+		classObj.prototype.__construct = constructor;
+
+		// Register as directive
+		Chick.directiveClasses[tag] = classObj;
+		return classObj;
+
+	};
+
+	Chick.getDirectiveInstance = function(index) {
+
+		return Chick.createdDirectives[index];
+
+	};
+
+
+	///////////////////
+	// Broadcasting. //
+	///////////////////
+
+	var broadcastListeners = {};
+	Chick.broadcast = function(name, args, context) {
+
+		// Listeners?
+		if (broadcastListeners[name] === undefined) return;
+		_.each(broadcastListeners[name], function(cb) {
+
+			cb.apply(context, args);
+
+		});
+
+	};
+
+	Chick.listen = function(name, cb) {
+
+		// Add the callback
+		if (broadcastListeners[name] === undefined) broadcastListeners[name] = [];
+		broadcastListeners[name].push(cb);
+
+	};
+
+	Chick.unlisten = function(name, cb) {
+
+		if (broadcastListeners[name] === undefined) return;
+		broadcastListeners[name] = _.without(broadcastListeners[name], cb);
+
+	};
+
+
+
+
+
+})();
+
 'use strict';
 (function(ns) {
 
@@ -472,6 +565,43 @@ if (window.console === undefined) {
 	};
 
 
+	Model.prototype.set = function(key, value) {
+		
+		// Dots?
+		if (key.indexOf('.') > 0) {
+
+			// Get the object one level up.
+			var parts = key.split('.'),
+				lastPart = parts.pop(),
+				parentKey = parts.join('.'),
+				obj = this.get(parentKey);
+
+				console.log('I want to set ', lastPart, ' of ', obj);
+			
+		} else {
+
+			// A function defined?
+			var funcName = 'set' + inflection.camelize(key);
+			if (typeof this[funcName] === 'function') return this[funcName](value);
+
+			// Is it a date? Convert back to timestamp
+			if (moment.isMoment(value)) {
+				value = moment.toIsoString();
+			}
+
+			// Same?
+			if (value === this.__attributes[key]) return;
+
+			// Set it
+			this.__dirty[key] = value;
+			this.__attributes[key] = value;
+
+		}
+
+
+	};
+
+
 
 	Model.prototype.each = function(key, callback) {
 
@@ -627,6 +757,7 @@ if (window.console === undefined) {
 
 		this.__primaryKey = 'id';
 		this.__attributes = {};
+		this.__dirty = {};
 		this.__links = {};
 
 	};
@@ -634,6 +765,110 @@ if (window.console === undefined) {
 	Model.prototype.getPrimary = function() {
 
 		return this.__attributes[this.__primaryKey];
+
+	};
+
+	////////////////////////////////
+	// Editing and saving methods //
+	////////////////////////////////
+
+
+	Model.prototype.isNew = function() {
+
+		// Do I have my primary key set?
+		return this.__attributes[this.__primaryKey]	=== undefined || this.__attributes[this.__primaryKey] === null;
+
+	};
+
+	Model.prototype.getApiUrl = function() {
+
+		// Anything defined?
+		var url = this.constructor.apiUrl;
+		if (!url) {
+
+			// Guess by name
+			url = '/' + _.underscored(this.constructor.name);
+		}
+
+		// Add id?
+		if (!this.isNew()) url += '/' + this.__attributes[this.__primaryKey];
+
+		return url;
+
+	};
+
+	Model.prototype.save = function() {
+
+		// Get an array of dirty data
+		var self = this;
+		var data = _.omit(this.__attributes, this.__primaryKey);
+
+		// Form the url
+		var modelUrl = this.getApiUrl(),
+			method = this.isNew() ? 'post' : 'put',
+			action = this.isNew() ? 'create' : 'update';
+
+
+		// Make that call.
+		var promise = Chick.promise();
+		var apiCall = Chick.Net.Api.call(modelUrl, data, {
+			method: method
+		}).then(function(result) {
+			
+			// Replace the model with created one.
+			self.__attributes = result.records.first().__attributes;
+
+			// Broadcast it broadly.
+			Chick.broadcast(self.constructor.name + '.' + action, [self]);
+		
+			// Good!
+			promise.resolve(result);
+
+
+		}).fail(function(error) {
+			
+			promise.reject(error);
+
+		});
+		return promise;
+
+	};
+
+	Model.prototype.destroy = function() {
+
+		// Form the url
+		var modelUrl = this.getApiUrl();
+		return Chick.Net.Api.call(modelUrl, {}, {
+			method: 'delete'
+		}).then(function() {
+
+			// Broadcast it broadly.
+			Chick.broadcast(self.constructor.name + '.destroy', [self]);
+		
+
+		})
+			
+
+
+
+	};
+
+
+	////////////////////
+	// Static methods //
+	////////////////////
+
+	Model.create = function(className, startValues) {
+
+		// Find the model class
+		var ModelClass = ns.Models[className];
+		if (ModelClass === undefined) throw "Unknown model class " + className;
+
+		// Instantiate
+		var model = new ModelClass();
+		if (startValues) model.deserialize(startValues);
+
+		return model;
 
 	};
 
@@ -1372,21 +1607,27 @@ if (window.console === undefined) {
 		p = this.__getPattern()
 
 			// ":name" will match any word or multiple words
-			.replace(/\/:([a-zA-Z]+)/g, function(match) {
-				params.push(match.replace(/\/:/, ''));
+			.replace(/\/:([a-zA-Z]+)/g, function(all, param) {
+				params.push(param);
 				return '/([-a-zA-Z0-9,]+)';
 			})
 
 			// as will "{name}"
-			.replace(/\/{([a-zA-Z]+)}/g, function(match) {
-				params.push(match.replace(/\/:/, ''));
+			.replace(/\/{([a-zA-Z]+)}/g, function(all, param) {
+				params.push(param);
 				return '/([-a-zA-Z0-9,]+)';
 			})
 
-			// "#name" will match any single number
-			.replace(/\/\#([a-zA-Z]+)/g, function(match) {
-				params.push(match.replace(/\/:/, ''));
+			// "{#name}" will match any single number
+			.replace(/\/{\#([a-zA-Z]+)}/g, function(all, param) {
+				params.push(param);
 				return '/([0-9]+)';
+			})
+
+			// "{*name" will match any string, including forward-slashes
+			.replace(/\/{\*([a-zA-Z]+)}/g, function(all, param) {
+				params.push(param);
+				return '/(.+)';
 			});
 
 
@@ -1420,7 +1661,7 @@ if (window.console === undefined) {
 
 			baseUrl: '/',
 			catchLinks: true,
-			catchForms: true,
+			catchForms: false,
 			controllerNamespace: null
 			
 		}, options);
@@ -2071,6 +2312,207 @@ Chick.api = function() {
 'use strict';
 (function(ns) {
 
+	function Directive($el, options) {
+
+	}
+	ns.register('Gui.Directive', Directive);
+
+
+
+	////////////////////
+	// Static methods //
+	////////////////////
+
+	Directive.enableDirectives = function($el, data, view) {
+			
+		// Store created directives
+		var createdDirectives = {},
+			creationCounts = {};
+
+		// Find tags
+		var tags = _.keys(Chick.directiveClasses),
+			query = tags.join(':not([data-directive]),') + ':not([data-directive])',
+			$elements = $el.find(query);
+		for (var q = $elements.length - 1; q >= 0; q--) {
+
+			// Get all attributes into options
+			var dir = $elements.get(q),
+				options = {},
+				broadcastListeners = {};
+			_.each(dir.attributes, function(attr) {
+				
+				// Is it a broadcast-listener?
+				if (/\-on$/.test(attr.name)) {
+
+					// Get method, and the events to listen to
+					var method = attr.name.substr(0, attr.name.length-3),
+						events = attr.value.split(/\s*,\s*/);
+					_.each(events, function(eventName) {
+						if (broadcastListeners[eventName] === undefined) broadcastListeners[eventName] = [];
+						broadcastListeners[eventName].push(method);
+					});
+
+				}
+
+				// Check if name is a 'chick-' special (needs to be eval'ed)
+				if (/^chick\-/.test(attr.name)) {
+
+					// Evaluate the attribute's value
+					var name = _.camelize(attr.name.substr(6)),
+						func = function() {
+							return eval(attr.value);
+						}
+						value = func.call(data);
+
+					// Store!
+					options[name] = value;
+
+				} else {
+
+					// Convert value into proper type
+					var value = attr.value;
+					if (value === '' || value === 'true') {
+						value = true;
+					} else if (value === 'false') {
+						value = false;
+					} else {
+						try {
+							value = JSON.parse(value);
+						} catch(e) {}
+					}
+					options[_.camelize(attr.name)] = value;
+
+				}
+			});
+
+			
+			// Create an instance
+			var $directive = $(dir),
+				DirectiveClass = Chick.directiveClasses[dir.tagName.toLowerCase()],
+				directive = new DirectiveClass($directive, options);
+
+			// Set some basic values
+			directive.$element = $directive;
+			directive.settings = _.extend({}, DirectiveClass.defaultSettings, options);
+
+
+			// And..... construct!
+			if (directive.__construct() !== false) {
+			
+				// Store it globally
+				Chick.createdDirectives.push(directive);
+				$directive.attr('data-directive', Chick.createdDirectives.length - 1);
+
+				// Do we have a name/id for it?
+				var name;
+				if (options.id) {
+					name = options.id;
+				} else {
+
+					// Count the number of instantiated directives
+					var dirName = _.camelize(dir.tagName.toLowerCase());
+					if (creationCounts[dirName] === undefined) creationCounts[dirName] = 0;
+
+					// Use that as a name
+					name = dirName + creationCounts[dirName];
+
+					// Count on.
+					creationCounts[dirName]++;
+
+				}
+
+				// Remember it
+				createdDirectives[name] = directive;
+
+				// Apply global event listeners
+				_.each(broadcastListeners, function(methods, eventName) {
+					Chick.listen(eventName, function(args) {
+						_.each(methods, function(method) {
+							directive[method].apply(directive, args);
+						});
+					});					
+				});
+
+
+			} 
+		
+		}
+
+		// Done.
+		return createdDirectives;
+
+	};
+
+
+	////////////////////
+	// Public methods //
+	////////////////////
+
+	Directive.prototype.getElement = function() {
+
+		// This is set when the tag is recognised and the class is instantiated
+		return this.$element;
+
+	};
+
+	Directive.prototype.findChildDirectives = function(type, onlyImmediateChildren) {
+
+		// Type defined?
+		var query = '[data-directive]';
+		if (type !== undefined) query = type + query;
+		if (onlyImmediateChildren === true) query = '>' + query;
+
+		// Find elements
+		var children = [];
+		this.$element.find(query).each(function(index, child) {
+
+			// Get directive instance
+			children.push(Chick.getDirectiveInstance($(child).attr('data-directive')));
+
+		});
+
+		
+		return children;
+
+	};
+
+
+
+	Directive.prototype.findTemplate = function(tag, mandatory, removeTag) {
+
+		// Find the tag and make it into an underscore template
+		var $el = this.$element.find('>' + tag),
+			template = $el.html();
+		template = _.replaceAll(template, '<#', '<%');
+		template = _.replaceAll(template, '&lt;#', '<%');
+		template = _.replaceAll(template, '#>', '%>');
+		template = _.replaceAll(template, '#&gt;', '%>');
+
+		// Anyting?
+		if (template.length === 0) {
+			if (mandatory === true) throw 'The ' + this.$element[0].tagName.toLowerCase() + ' directive needs a <' + tag + '> tag containing an underscore-template, using <# and #>.';
+			return false;
+		}
+
+		// Remove this tag?
+		if (removeTag !== false) {
+			$el.remove();
+		}
+
+		// Create the template
+		return new Chick.Gui.Template(template);
+
+	};
+
+
+
+
+
+})(Chick);
+
+'use strict';
+(function(ns) {
+
 	var I18n = ns.register('Gui.I18n');
 
 	I18n.language = $('html').attr('lang') || 'en';
@@ -2295,13 +2737,13 @@ Chick.api = function() {
 		
 		this.data = {}; 
 
+		this.forms = {};
+
 		this.template = null;
 		this.__loadPromise = undefined;
 		this.__waitFor = [];
 		this.__waitForLeaveAnimation = false;
 		
-		this.$element = $('<div class="view"></div>').addClass(inflection.dasherize(source).split('\/').join('-'));
-
 		this.__registerEvents(['ready', 'leave', 'render']);
 
 	}
@@ -2456,6 +2898,17 @@ Chick.api = function() {
 	};
 	View.prototype.withModel = function(key, apiCallOrModel, processCallback) {
 
+		// Is the data just a simple hash-object?
+		if (typeof apiCallOrModel === 'object' && !Chick.Core.Model.prototype.isPrototypeOf(apiCallOrModel)
+			&& !Chick.Net.ApiCall.prototype.isPrototypeOf(apiCallOrModel)) {
+
+			// Convert it into a model
+			var model = new Chick.Core.Model();
+			model.deserialize(apiCallOrModel);
+			apiCallOrModel = model;
+
+		}
+
 		// Add as data with a custom resolver to return the collection instead of APIResult
 		return this.withData(key, apiCallOrModel, function(promise, data) {
 
@@ -2482,6 +2935,20 @@ Chick.api = function() {
 		});
 
 	};
+
+
+	View.prototype.onSubmit = function(name, submitCallback) {
+
+		// Store it.
+		this.forms[name] = {
+			name: name,
+			submitCallback: submitCallback
+		};
+
+		return this;
+
+	};
+
 
 
 
@@ -2534,10 +3001,31 @@ Chick.api = function() {
 		ns.when(this.__waitFor).then(function() {
 
 			// Now run the template into my element
-			view.$element.html(view.template.run(view.data));
+			view.$element = $(view.template.run(view.data));
 
 			// Enable the content
 			ns.enableContent(view.$element);
+
+			// Enable the directives
+			view.directives = Chick.Gui.Directive.enableDirectives(
+				view.$element,
+				view.data,
+				view
+			);
+
+			// Check for forms
+			_.each(view.forms, function(info, name) {
+
+				// Find the form
+				view.$element.find('form[name=' + name + ']').on('submit', function(e) {
+					e.preventDefault();
+
+					// Call it, with the view as context
+					info.submitCallback.apply(view, [$(this), e]);
+
+				});
+
+			});
 
 			// Now run it with my data
 			promise.resolve(view.$element);
@@ -2643,6 +3131,9 @@ Chick.api = function() {
 		this.lastSetByRoute = false;
 		this.lastSetByRouteParams = false;
 
+		// Store me on the view container
+		this.$target.data('viewcontainer', this);
+
 	}
 	ns.register('Gui.ViewContainer', ns.Core.TriggerClass, ViewContainer);
 	
@@ -2665,14 +3156,11 @@ Chick.api = function() {
 	ViewContainer.prototype.setContent = function(html, byRoute, byRouteParams) {
 
 		// Store last route (this is to check whether the viewcontainer needs a refresh is a sub-page is loaded)
-		this.lastSetByRoute = byRoute;
+		this.lastSetByRoute = byRoute ? byRoute : false;
 		this.lastSetByRouteParams = byRouteParams;
 
 		// Set it.
 		this.$target.html(html);
-
-		// Process it.
-		Chick.enableContent(this.$target);
 
 		// Update view containers
 		Chick.app.findViewContainers();
@@ -2727,7 +3215,7 @@ Chick.api = function() {
 				bundles: []
 			},
 
-			languageInUrl: true,
+			languageInUrl: false,
 			debug: true
 
 		}, options);
@@ -2739,7 +3227,7 @@ Chick.api = function() {
 		this.__errorHandlers = {
 
 		};
-
+		this.__defaultErrorViewContainer = 'main';
 
 		// Elements for future use
 		this.$window = $(window);
@@ -2811,6 +3299,8 @@ Chick.api = function() {
 			app.__onResize();
 
 		});
+
+
 
 		return this;
 
@@ -2892,15 +3382,19 @@ Chick.api = function() {
 
 	};
 
-	App.prototype.errors = function(errorHandlers) {
+	App.prototype.errors = function(errorHandlers, defaultErrorViewContainer) {
 
 		// Merge the errors
 		this.__errorHandlers = ns.extend(this.__errorHandlers, errorHandlers);
+		if (defaultErrorViewContainer !== undefined) this.__defaultErrorViewContainer = defaultErrorViewContainer;
 		return this;		
 
 	};
 
-	App.prototype.handleError = function(code, message) {
+	App.prototype.handleError = function(code, message, targetViewContainer) {
+
+		// Which target view
+		targetViewContainer = this.getViewContainer(targetViewContainer === undefined ? this.__defaultErrorViewContainer : targetViewContainer);
 
 		// Custom handler?
 		if (this.__errorHandlers[code] !== undefined) {
@@ -2909,27 +3403,26 @@ Chick.api = function() {
 			var errorResult = this.__errorHandlers[code](message),
 			app = this;
 
-			throw 'ERROR HANDLING NOT IMPLEMENTED: ' + code + ': ' + message;
-/*
 			if (ns.Gui.View.prototype.isPrototypeOf(errorResult)) {
 
 				errorResult.render().then(function(result) {
-					app.interface.setContent(result);
+					targetViewContainer(result);
 				});
 				
 			} else if (ns.isPromise(errorResult))  {
 				
 				errorResult.then(function(result) {
-					app.interface.setContent(result);
+					targetViewContainer.setContent(result);
 				});
+
 			} else {
-				this.interface.setContent(errorResult);
-			}*/
+				targetViewContainer.setContent(errorResult);
+			}
 
 		} else {
 
 			// Set content.
-			this.interface.setContent('Error ' + code);
+			targetViewContainer.setContent('Error ' + code);
 
 		}
 
@@ -2994,8 +3487,8 @@ Chick.api = function() {
 		// Listen to the router //
 		//////////////////////////
 
-		this.router.on('error', function(code) {
-			app.handleError(code);
+		this.router.on('error', function(code, message, targetViewContainer) {
+			app.handleError(code, message, targetViewContainer);
 		});
 
 	};

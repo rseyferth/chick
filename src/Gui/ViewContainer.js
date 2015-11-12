@@ -11,6 +11,9 @@
 		this.lastSetByRoute = false;
 		this.lastSetByRouteParams = false;
 
+		// Store me on the view container
+		this.$target.data('viewcontainer', this);
+
 	}
 	ns.register('Gui.ViewContainer', ns.Core.TriggerClass, ViewContainer);
 	
@@ -33,14 +36,11 @@
 	ViewContainer.prototype.setContent = function(html, byRoute, byRouteParams) {
 
 		// Store last route (this is to check whether the viewcontainer needs a refresh is a sub-page is loaded)
-		this.lastSetByRoute = byRoute;
+		this.lastSetByRoute = byRoute ? byRoute : false;
 		this.lastSetByRouteParams = byRouteParams;
 
 		// Set it.
 		this.$target.html(html);
-
-		// Process it.
-		Chick.enableContent(this.$target);
 
 		// Update view containers
 		Chick.app.findViewContainers();

@@ -9,13 +9,13 @@
 		
 		this.data = {}; 
 
+		this.forms = {};
+
 		this.template = null;
 		this.__loadPromise = undefined;
 		this.__waitFor = [];
 		this.__waitForLeaveAnimation = false;
 		
-		this.$element = $('<div class="view"></div>').addClass(inflection.dasherize(source).split('\/').join('-'));
-
 		this.__registerEvents(['ready', 'leave', 'render']);
 
 	}
@@ -170,6 +170,17 @@
 	};
 	View.prototype.withModel = function(key, apiCallOrModel, processCallback) {
 
+		// Is the data just a simple hash-object?
+		if (typeof apiCallOrModel === 'object' && !Chick.Core.Model.prototype.isPrototypeOf(apiCallOrModel)
+			&& !Chick.Net.ApiCall.prototype.isPrototypeOf(apiCallOrModel)) {
+
+			// Convert it into a model
+			var model = new Chick.Core.Model();
+			model.deserialize(apiCallOrModel);
+			apiCallOrModel = model;
+
+		}
+
 		// Add as data with a custom resolver to return the collection instead of APIResult
 		return this.withData(key, apiCallOrModel, function(promise, data) {
 
@@ -196,6 +207,20 @@
 		});
 
 	};
+
+
+	View.prototype.onSubmit = function(name, submitCallback) {
+
+		// Store it.
+		this.forms[name] = {
+			name: name,
+			submitCallback: submitCallback
+		};
+
+		return this;
+
+	};
+
 
 
 
@@ -248,10 +273,31 @@
 		ns.when(this.__waitFor).then(function() {
 
 			// Now run the template into my element
-			view.$element.html(view.template.run(view.data));
+			view.$element = $(view.template.run(view.data));
 
 			// Enable the content
 			ns.enableContent(view.$element);
+
+			// Enable the directives
+			view.directives = Chick.Gui.Directive.enableDirectives(
+				view.$element,
+				view.data,
+				view
+			);
+
+			// Check for forms
+			_.each(view.forms, function(info, name) {
+
+				// Find the form
+				view.$element.find('form[name=' + name + ']').on('submit', function(e) {
+					e.preventDefault();
+
+					// Call it, with the view as context
+					info.submitCallback.apply(view, [$(this), e]);
+
+				});
+
+			});
 
 			// Now run it with my data
 			promise.resolve(view.$element);

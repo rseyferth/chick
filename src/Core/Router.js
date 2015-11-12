@@ -11,7 +11,7 @@
 
 			baseUrl: '/',
 			catchLinks: true,
-			catchForms: true,
+			catchForms: false,
 			controllerNamespace: null
 			
 		}, options);

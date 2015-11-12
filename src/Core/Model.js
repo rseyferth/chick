@@ -153,6 +153,43 @@
 	};
 
 
+	Model.prototype.set = function(key, value) {
+		
+		// Dots?
+		if (key.indexOf('.') > 0) {
+
+			// Get the object one level up.
+			var parts = key.split('.'),
+				lastPart = parts.pop(),
+				parentKey = parts.join('.'),
+				obj = this.get(parentKey);
+
+				console.log('I want to set ', lastPart, ' of ', obj);
+			
+		} else {
+
+			// A function defined?
+			var funcName = 'set' + inflection.camelize(key);
+			if (typeof this[funcName] === 'function') return this[funcName](value);
+
+			// Is it a date? Convert back to timestamp
+			if (moment.isMoment(value)) {
+				value = moment.toIsoString();
+			}
+
+			// Same?
+			if (value === this.__attributes[key]) return;
+
+			// Set it
+			this.__dirty[key] = value;
+			this.__attributes[key] = value;
+
+		}
+
+
+	};
+
+
 
 	Model.prototype.each = function(key, callback) {
 
@@ -308,6 +345,7 @@
 
 		this.__primaryKey = 'id';
 		this.__attributes = {};
+		this.__dirty = {};
 		this.__links = {};
 
 	};
@@ -315,6 +353,110 @@
 	Model.prototype.getPrimary = function() {
 
 		return this.__attributes[this.__primaryKey];
+
+	};
+
+	////////////////////////////////
+	// Editing and saving methods //
+	////////////////////////////////
+
+
+	Model.prototype.isNew = function() {
+
+		// Do I have my primary key set?
+		return this.__attributes[this.__primaryKey]	=== undefined || this.__attributes[this.__primaryKey] === null;
+
+	};
+
+	Model.prototype.getApiUrl = function() {
+
+		// Anything defined?
+		var url = this.constructor.apiUrl;
+		if (!url) {
+
+			// Guess by name
+			url = '/' + _.underscored(this.constructor.name);
+		}
+
+		// Add id?
+		if (!this.isNew()) url += '/' + this.__attributes[this.__primaryKey];
+
+		return url;
+
+	};
+
+	Model.prototype.save = function() {
+
+		// Get an array of dirty data
+		var self = this;
+		var data = _.omit(this.__attributes, this.__primaryKey);
+
+		// Form the url
+		var modelUrl = this.getApiUrl(),
+			method = this.isNew() ? 'post' : 'put',
+			action = this.isNew() ? 'create' : 'update';
+
+
+		// Make that call.
+		var promise = Chick.promise();
+		var apiCall = Chick.Net.Api.call(modelUrl, data, {
+			method: method
+		}).then(function(result) {
+			
+			// Replace the model with created one.
+			self.__attributes = result.records.first().__attributes;
+
+			// Broadcast it broadly.
+			Chick.broadcast(self.constructor.name + '.' + action, [self]);
+		
+			// Good!
+			promise.resolve(result);
+
+
+		}).fail(function(error) {
+			
+			promise.reject(error);
+
+		});
+		return promise;
+
+	};
+
+	Model.prototype.destroy = function() {
+
+		// Form the url
+		var modelUrl = this.getApiUrl();
+		return Chick.Net.Api.call(modelUrl, {}, {
+			method: 'delete'
+		}).then(function() {
+
+			// Broadcast it broadly.
+			Chick.broadcast(self.constructor.name + '.destroy', [self]);
+		
+
+		})
+			
+
+
+
+	};
+
+
+	////////////////////
+	// Static methods //
+	////////////////////
+
+	Model.create = function(className, startValues) {
+
+		// Find the model class
+		var ModelClass = ns.Models[className];
+		if (ModelClass === undefined) throw "Unknown model class " + className;
+
+		// Instantiate
+		var model = new ModelClass();
+		if (startValues) model.deserialize(startValues);
+
+		return model;
 
 	};
 
