@@ -57,9 +57,6 @@
 			}
 
 
-			// We call GET requests with query-data a POST request.
-			this.method = 'post';
-
 			// Remove from url
 			url = url.substr(0, queryIndex);
 

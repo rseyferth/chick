@@ -171,8 +171,7 @@
 	View.prototype.withModel = function(key, apiCallOrModel, processCallback) {
 
 		// Is the data just a simple hash-object?
-		if (typeof apiCallOrModel === 'object' && !Chick.Core.Model.prototype.isPrototypeOf(apiCallOrModel)
-			&& !Chick.Net.ApiCall.prototype.isPrototypeOf(apiCallOrModel)) {
+		if (typeof apiCallOrModel === 'object' && !Chick.Core.Model.prototype.isPrototypeOf(apiCallOrModel) && !Chick.Net.ApiCall.prototype.isPrototypeOf(apiCallOrModel)) {
 
 			// Convert it into a model
 			var model = new Chick.Core.Model();

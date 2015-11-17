@@ -44,14 +44,15 @@
 				}
 
 				// Check if name is a 'chick-' special (needs to be eval'ed)
+				var value;
 				if (/^chick\-/.test(attr.name)) {
 
 					// Evaluate the attribute's value
 					var name = _.camelize(attr.name.substr(6)),
 						func = function() {
 							return eval(attr.value);
-						}
-						value = func.call(data);
+						};
+					value = func.call(data);
 
 					// Store!
 					options[name] = value;
@@ -59,7 +60,7 @@
 				} else {
 
 					// Convert value into proper type
-					var value = attr.value;
+					value = attr.value;
 					if (value === '' || value === 'true') {
 						value = true;
 					} else if (value === 'false') {

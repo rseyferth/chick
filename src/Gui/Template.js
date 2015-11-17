@@ -4,11 +4,19 @@
 	function Template(source, options) {
 
 		// Create handlebars
-		this.run = _.template(source, options);
+		this.__compiled = _.template(source, options);
 
 	}
 	ns.register('Gui.Template', Template);
 
+
+	Template.prototype.run = function(data) {
+		var result = this.__compiled(data);
+		_.each(Template.hooks, function(cb) {
+			result = cb(result, data);
+		});
+		return result;
+	};
 
 	Template.prototype.use = function(data, $target) {
 
@@ -17,6 +25,14 @@
 		return $target;
 
 	};
+
+	Template.hooks = [];
+
+	Template.hook = function(cb) {
+		Template.hooks.push(cb);
+		return Template;
+	};
+
 
 
 	// Global

@@ -4,7 +4,7 @@
 	window.Chick = window.Chick || {};
 
 	// Enable Underscore.string extension
-	_.mixin(s.exports());
+	_.mixin(window.s.exports());
 
 	Chick.register = function(ns, dataOrParentClass, dataOrNull) {
 
@@ -56,6 +56,13 @@
 		return Chick.Gui.View.make(name);
 	};
 
+
+	Chick.isModel = function(obj) {
+		return typeof obj === 'object' && Chick.Core.Model.prototype.isPrototypeOf(obj);
+	};
+	Chick.isCollection = function(obj) {
+		return typeof obj === 'object' && Chick.Core.Collection.prototype.isPrototypeOf(obj);
+	};
 
 
 	Chick.promise = function() {
@@ -124,10 +131,13 @@
 	Chick.redirect = function(url) {
 		return new Chick.Core.Redirect(url);
 	};
+	Chick.gotoUri = function(url) {
+		url = Chick.url(url);
+		return Chick.app.router.open(url);
+	};
 
 
-
-	var dot = new DotObject();
+	var dot = new window.DotObject();
 	window.dot = dot;
 
 
@@ -180,7 +190,7 @@
 	Chick.registerDirective = function(tag, classObj, constructor) {
 
 		// Register as class
-		classObj = Chick.register('Chick.Directives.' + _.classify(tag), Chick.Gui.Directive, classObj);
+		classObj = Chick.register('Directives.' + _.classify(tag), Chick.Gui.Directive, classObj);
 
 		// Add constructor
 		classObj.prototype.__construct = constructor;
@@ -215,11 +225,20 @@
 
 	};
 
-	Chick.listen = function(name, cb) {
+	Chick.listen = function(names, cb) {
 
+		// Split it.
+		if (typeof names === 'string') {
+			names = names.split(/\s*,\s*/);
+		}
+		
 		// Add the callback
-		if (broadcastListeners[name] === undefined) broadcastListeners[name] = [];
-		broadcastListeners[name].push(cb);
+		_.each(names, function(name) {
+
+			if (broadcastListeners[name] === undefined) broadcastListeners[name] = [];
+			broadcastListeners[name].push(cb);
+
+		});
 
 	};
 

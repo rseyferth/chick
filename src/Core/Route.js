@@ -197,7 +197,6 @@
 			if (queue.length === 0) {
 
 				// Finished!
-				console.log(combinedResult);
 				promise.resolve(combinedResult);
 				return;
 
@@ -398,13 +397,13 @@
 			// ":name" will match any word or multiple words
 			.replace(/\/:([a-zA-Z]+)/g, function(all, param) {
 				params.push(param);
-				return '/([-a-zA-Z0-9,]+)';
+				return '/([-a-zA-Z0-9,\.]+)';
 			})
 
 			// as will "{name}"
 			.replace(/\/{([a-zA-Z]+)}/g, function(all, param) {
 				params.push(param);
-				return '/([-a-zA-Z0-9,]+)';
+				return '/([-a-zA-Z0-9,\.]+)';
 			})
 
 			// "{#name}" will match any single number

@@ -4,7 +4,7 @@
 	window.Chick = window.Chick || {};
 
 	// Enable Underscore.string extension
-	_.mixin(s.exports());
+	_.mixin(window.s.exports());
 
 	Chick.register = function(ns, dataOrParentClass, dataOrNull) {
 
@@ -56,6 +56,13 @@
 		return Chick.Gui.View.make(name);
 	};
 
+
+	Chick.isModel = function(obj) {
+		return typeof obj === 'object' && Chick.Core.Model.prototype.isPrototypeOf(obj);
+	};
+	Chick.isCollection = function(obj) {
+		return typeof obj === 'object' && Chick.Core.Collection.prototype.isPrototypeOf(obj);
+	};
 
 
 	Chick.promise = function() {
@@ -124,10 +131,13 @@
 	Chick.redirect = function(url) {
 		return new Chick.Core.Redirect(url);
 	};
+	Chick.gotoUri = function(url) {
+		url = Chick.url(url);
+		return Chick.app.router.open(url);
+	};
 
 
-
-	var dot = new DotObject();
+	var dot = new window.DotObject();
 	window.dot = dot;
 
 
@@ -180,7 +190,7 @@
 	Chick.registerDirective = function(tag, classObj, constructor) {
 
 		// Register as class
-		classObj = Chick.register('Chick.Directives.' + _.classify(tag), Chick.Gui.Directive, classObj);
+		classObj = Chick.register('Directives.' + _.classify(tag), Chick.Gui.Directive, classObj);
 
 		// Add constructor
 		classObj.prototype.__construct = constructor;
@@ -215,11 +225,20 @@
 
 	};
 
-	Chick.listen = function(name, cb) {
+	Chick.listen = function(names, cb) {
 
+		// Split it.
+		if (typeof names === 'string') {
+			names = names.split(/\s*,\s*/);
+		}
+		
 		// Add the callback
-		if (broadcastListeners[name] === undefined) broadcastListeners[name] = [];
-		broadcastListeners[name].push(cb);
+		_.each(names, function(name) {
+
+			if (broadcastListeners[name] === undefined) broadcastListeners[name] = [];
+			broadcastListeners[name].push(cb);
+
+		});
 
 	};
 
@@ -837,19 +856,16 @@
 	Model.prototype.destroy = function() {
 
 		// Form the url
-		var modelUrl = this.getApiUrl();
+		var modelUrl = this.getApiUrl(),
+			self = this;
 		return Chick.Net.Api.call(modelUrl, {}, {
 			method: 'delete'
 		}).then(function() {
 
 			// Broadcast it broadly.
-			Chick.broadcast(self.constructor.name + '.destroy', [self]);
-		
+			Chick.broadcast(self.constructor.name + '.destroy', [self]);		
 
-		})
-			
-
-
+		});
 
 	};
 
@@ -862,7 +878,7 @@
 
 		// Find the model class
 		var ModelClass = ns.Models[className];
-		if (ModelClass === undefined) throw "Unknown model class " + className;
+		if (ModelClass === undefined) throw 'Unknown model class ' + className;
 
 		// Instantiate
 		var model = new ModelClass();
@@ -1143,9 +1159,6 @@
 			}
 
 
-			// We call GET requests with query-data a POST request.
-			this.method = 'post';
-
 			// Remove from url
 			url = url.substr(0, queryIndex);
 
@@ -1408,7 +1421,6 @@
 			if (queue.length === 0) {
 
 				// Finished!
-				console.log(combinedResult);
 				promise.resolve(combinedResult);
 				return;
 
@@ -1609,13 +1621,13 @@
 			// ":name" will match any word or multiple words
 			.replace(/\/:([a-zA-Z]+)/g, function(all, param) {
 				params.push(param);
-				return '/([-a-zA-Z0-9,]+)';
+				return '/([-a-zA-Z0-9,\.]+)';
 			})
 
 			// as will "{name}"
 			.replace(/\/{([a-zA-Z]+)}/g, function(all, param) {
 				params.push(param);
-				return '/([-a-zA-Z0-9,]+)';
+				return '/([-a-zA-Z0-9,\.]+)';
 			})
 
 			// "{#name}" will match any single number
@@ -1695,7 +1707,7 @@
 				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]');
 				$btns.on('click', function(e) {
 					e.preventDefault();
-					History.pushState(null, null, router.baseUrl + $(this).attr('href'));
+					History.pushState(null, null, $(this).attr('href'));
 				});
 			});
 
@@ -2355,14 +2367,15 @@ Chick.api = function() {
 				}
 
 				// Check if name is a 'chick-' special (needs to be eval'ed)
+				var value;
 				if (/^chick\-/.test(attr.name)) {
 
 					// Evaluate the attribute's value
 					var name = _.camelize(attr.name.substr(6)),
 						func = function() {
 							return eval(attr.value);
-						}
-						value = func.call(data);
+						};
+					value = func.call(data);
 
 					// Store!
 					options[name] = value;
@@ -2370,7 +2383,7 @@ Chick.api = function() {
 				} else {
 
 					// Convert value into proper type
-					var value = attr.value;
+					value = attr.value;
 					if (value === '' || value === 'true') {
 						value = true;
 					} else if (value === 'false') {
@@ -2698,11 +2711,19 @@ Chick.api = function() {
 	function Template(source, options) {
 
 		// Create handlebars
-		this.run = _.template(source, options);
+		this.__compiled = _.template(source, options);
 
 	}
 	ns.register('Gui.Template', Template);
 
+
+	Template.prototype.run = function(data) {
+		var result = this.__compiled(data);
+		_.each(Template.hooks, function(cb) {
+			result = cb(result, data);
+		});
+		return result;
+	};
 
 	Template.prototype.use = function(data, $target) {
 
@@ -2711,6 +2732,14 @@ Chick.api = function() {
 		return $target;
 
 	};
+
+	Template.hooks = [];
+
+	Template.hook = function(cb) {
+		Template.hooks.push(cb);
+		return Template;
+	};
+
 
 
 	// Global
@@ -2899,8 +2928,7 @@ Chick.api = function() {
 	View.prototype.withModel = function(key, apiCallOrModel, processCallback) {
 
 		// Is the data just a simple hash-object?
-		if (typeof apiCallOrModel === 'object' && !Chick.Core.Model.prototype.isPrototypeOf(apiCallOrModel)
-			&& !Chick.Net.ApiCall.prototype.isPrototypeOf(apiCallOrModel)) {
+		if (typeof apiCallOrModel === 'object' && !Chick.Core.Model.prototype.isPrototypeOf(apiCallOrModel) && !Chick.Net.ApiCall.prototype.isPrototypeOf(apiCallOrModel)) {
 
 			// Convert it into a model
 			var model = new Chick.Core.Model();

@@ -425,19 +425,16 @@
 	Model.prototype.destroy = function() {
 
 		// Form the url
-		var modelUrl = this.getApiUrl();
+		var modelUrl = this.getApiUrl(),
+			self = this;
 		return Chick.Net.Api.call(modelUrl, {}, {
 			method: 'delete'
 		}).then(function() {
 
 			// Broadcast it broadly.
-			Chick.broadcast(self.constructor.name + '.destroy', [self]);
-		
+			Chick.broadcast(self.constructor.name + '.destroy', [self]);		
 
-		})
-			
-
-
+		});
 
 	};
 
@@ -450,7 +447,7 @@
 
 		// Find the model class
 		var ModelClass = ns.Models[className];
-		if (ModelClass === undefined) throw "Unknown model class " + className;
+		if (ModelClass === undefined) throw 'Unknown model class ' + className;
 
 		// Instantiate
 		var model = new ModelClass();

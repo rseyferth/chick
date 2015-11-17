@@ -45,7 +45,7 @@
 				var $btns = $target.find('a').not('[href^="http"]').not('[href^="#"]').not('[href^="//"]');
 				$btns.on('click', function(e) {
 					e.preventDefault();
-					History.pushState(null, null, router.baseUrl + $(this).attr('href'));
+					History.pushState(null, null, $(this).attr('href'));
 				});
 			});
 
