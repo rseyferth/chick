@@ -37,8 +37,14 @@
 		return Chick.register(ns, Chick.Core.Controller, data);
 	};
 
-	Chick.registerModel = function(ns, data) {
-		return Chick.register('Models.' + ns, Chick.Core.Model, data);
+	Chick.registerModel = function(ns, data, inheritFrom) {
+		if (inheritFrom === undefined) {
+			inheritFrom = Chick.Core.Model;
+		} else if (typeof inheritFrom === 'string') {
+			inheritFrom = Chick.Models[inheritFrom];
+		}
+
+		return Chick.register('Models.' + ns, inheritFrom, data);
 	};
 
 
@@ -459,6 +465,8 @@
 
 		}
 
+		return this;
+
 	};
 
 	Model.prototype.get = function(key) {
@@ -820,7 +828,7 @@
 
 		// Get an array of dirty data
 		var self = this;
-		var data = _.omit(this.__attributes, this.__primaryKey);
+		var data = _.omit(this.toArray(), this.__primaryKey);
 
 		// Form the url
 		var modelUrl = this.getApiUrl(),

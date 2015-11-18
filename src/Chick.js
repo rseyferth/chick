@@ -37,8 +37,14 @@
 		return Chick.register(ns, Chick.Core.Controller, data);
 	};
 
-	Chick.registerModel = function(ns, data) {
-		return Chick.register('Models.' + ns, Chick.Core.Model, data);
+	Chick.registerModel = function(ns, data, inheritFrom) {
+		if (inheritFrom === undefined) {
+			inheritFrom = Chick.Core.Model;
+		} else if (typeof inheritFrom === 'string') {
+			inheritFrom = Chick.Models[inheritFrom];
+		}
+
+		return Chick.register('Models.' + ns, inheritFrom, data);
 	};
 
 

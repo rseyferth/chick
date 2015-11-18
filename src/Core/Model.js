@@ -28,6 +28,8 @@
 
 		}
 
+		return this;
+
 	};
 
 	Model.prototype.get = function(key) {
@@ -389,7 +391,7 @@
 
 		// Get an array of dirty data
 		var self = this;
-		var data = _.omit(this.__attributes, this.__primaryKey);
+		var data = _.omit(this.toArray(), this.__primaryKey);
 
 		// Form the url
 		var modelUrl = this.getApiUrl(),
