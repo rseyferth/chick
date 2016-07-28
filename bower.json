@@ -1,5 +1,5 @@
 {
-  "name": "Chick",
+  "name": "chick",
   "version": "0.2.13",
   "authors": [
     "Ruben Seyferth <ruben.seyferth@gmail.com>"
@@ -19,6 +19,7 @@
   "dependencies": {
     "jquery": ">=1.11.0",
     "underscore": "~1.7.0",
+    "underscore.string": "~3.3.4",
     "inflection": null,
     "moment": "~2.8.3",
     "history.js": "~1.8.0",
